@@ -1,4 +1,21 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, Component } from "react";
+
+// ─── Error Boundary ───
+class ErrorBoundary extends Component {
+  constructor(props){super(props);this.state={hasError:false,error:null};}
+  static getDerivedStateFromError(error){return{hasError:true,error};}
+  render(){
+    if(this.state.hasError) return(
+      <div style={{padding:40,textAlign:"center",color:"#E4E6EC",fontFamily:"system-ui",background:"#0d1117",minHeight:"100vh"}}>
+        <h2 style={{color:"#E05252",marginBottom:12}}>Something went wrong</h2>
+        <p style={{color:"#9298A8",marginBottom:12}}>Please refresh and try again.</p>
+        <pre style={{fontSize:11,color:"#555B6A",textAlign:"left",maxWidth:500,margin:"0 auto",whiteSpace:"pre-wrap"}}>{String(this.state.error)}</pre>
+        <button onClick={()=>this.setState({hasError:false,error:null})} style={{marginTop:16,padding:"8px 20px",borderRadius:6,border:"none",background:"#58A6FF",color:"#fff",cursor:"pointer",fontSize:13}}>Try Again</button>
+      </div>
+    );
+    return this.props.children;
+  }
+}
 
 // ─── CKD-EPI 2021 ───
 function calcEGFR(cr, age, sex) {
@@ -69,7 +86,7 @@ const Pill=({c:cl,bg,children})=><span style={{display:"inline-block",padding:"2
 const Inp=({value,onChange,placeholder,type="text",style:s})=><input type={type} value={value} onChange={e=>onChange(e.target.value)} placeholder={placeholder} style={{width:"100%",padding:"7px 10px",borderRadius:6,border:`1px solid ${C.bdr}`,background:C.bg,color:C.t1,fontSize:13,fontFamily:F,outline:"none",boxSizing:"border-box",...s}} onFocus={e=>e.target.style.borderColor=C.acc} onBlur={e=>e.target.style.borderColor=C.bdr}/>;
 const Sel=({value,onChange,options,ph})=><select value={value} onChange={e=>onChange(e.target.value)} style={{width:"100%",padding:"7px 10px",borderRadius:6,border:`1px solid ${C.bdr}`,background:C.bg,color:value?C.t1:C.t3,fontSize:13,fontFamily:F,outline:"none",boxSizing:"border-box"}}>{ph&&<option value="">{ph}</option>}{options.map(o=><option key={o.v} value={o.v}>{o.l}</option>)}</select>;
 const Box=({type,title,children})=>{const m={info:[C.acc,C.accS],warn:[C.w,C.wS],red:[C.r,C.rS],green:[C.g,C.gS]};const[bc,bg]=m[type]||m.info;return(<div style={{borderLeft:`3px solid ${bc}`,background:bg,borderRadius:"0 8px 8px 0",padding:"11px 13px",marginBottom:10}}>{title&&<div style={{fontWeight:700,fontSize:13,color:C.wh,marginBottom:3}}>{title}</div>}<div style={{fontSize:12,color:C.t1,lineHeight:1.6}}>{children}</div></div>)};
-const Btn=({onClick,children,primary,disabled,small,style:s})=><button onClick={onClick} disabled={disabled} style={{padding:small?"5px 12px":"9px 18px",borderRadius:7,border:primary?"none":`1px solid ${C.bdr}`,background:disabled?C.bdr:primary?C.acc:C.card,color:disabled?C.t3:primary?"#fff":C.t2,fontSize:small?12:13,fontWeight:600,fontFamily:F,cursor:disabled?"not-allowed":"pointer",width:small?"auto":"100%",...s}}>{children}</button>;
+const Btn=({onClick,children,primary,disabled,small,style:s})=><button onClick={onClick} disabled={disabled} style={{padding:small?"8px 14px":"12px 18px",minHeight:small?36:44,borderRadius:7,border:primary?"none":`1px solid ${C.bdr}`,background:disabled?C.bdr:primary?C.acc:C.card,color:disabled?C.t3:primary?"#fff":C.t2,fontSize:small?12:13,fontWeight:600,fontFamily:F,cursor:disabled?"not-allowed":"pointer",width:small?"auto":"100%",WebkitTapHighlightColor:"transparent",...s}}>{children}</button>;
 const Chk=({checked,onChange,label,tag})=><label style={{display:"flex",alignItems:"center",gap:7,cursor:"pointer",marginBottom:5}}><input type="checkbox" checked={checked} onChange={onChange} style={{accentColor:C.acc,width:14,height:14}}/><span style={{fontSize:12,color:C.t1,flex:1}}>{label}</span>{tag}</label>;
 
 const SectionHead=({number,title,active})=>(
@@ -96,7 +113,7 @@ function CopyNote({text}){
 }
 
 // ═══════════════════════════════════════
-export default function PA(){
+function PAInner(){
   const [view,setView]=useState(null);
   if(!view) return(
     <div style={{minHeight:"100vh",background:C.bg,fontFamily:F,display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
@@ -485,8 +502,8 @@ function InterpretTool({mode="pcp"}){
   const _egD=latSnap?ls.egD:egD;
   const _resHTN=latSnap?ls.resHTN:resHTN;
 
-  const ren=REN.find(r=>r.id===_rTid);
-  const ald=ALD.find(a=>a.id===_aTid);
+  const ren=REN.find(r=>r.id===_rTid)||REN[0];
+  const ald=ALD.find(a=>a.id===_aTid)||ALD[0];
   const rN=parseFloat(_rV),aN=parseFloat(_aV),kN=parseFloat(_kV);
   const arrTh=ARR[_rTid]?.[_aTid];
   const renSup=!isNaN(rN)&&rN<=ren.sup;
@@ -613,30 +630,8 @@ function InterpretTool({mode="pcp"}){
         </div>))}
       </div>
 
-      {/* ══ Determine how far from threshold ══ */}
-      {(() => {
-        const aldoRatio = !isNaN(aN) ? aN / ald.min : null; // >1 = above threshold
-        const arrRatio = (arrVal && arrTh) ? arrVal / arrTh : null;
-
-        // FP threshold in user's units: guideline says aldo >15 ng/dL IA or >10 ng/dL LC-MS/MS = PA likely despite BB
-        const fpHighThresh = ald.isIA
-          ? (ald.u === "pmol/L" ? 416 : 15)   // 15 ng/dL or 416 pmol/L for IA
-          : (ald.u === "pmol/L" ? 277 : 10);  // 10 ng/dL or 277 pmol/L for LC-MS/MS
-        const fpStronglyPositive = !isNaN(aN) && aN > fpHighThresh;
-        const fpWeaklyPositive = !isNaN(aN) && aN >= ald.min && aN <= fpHighThresh;
-
-        // FN near-threshold: tiered by drug strength
-        // Strong interferors (MRA, ENaC, drospirenone, diuretics): renin suppressed AND aldo>60% AND ARR>60%
-        // Weak interferors (ACEi, ARB, CCB, SGLT2i): ALL THREE: renin suppressed AND aldo>75% AND ARR>75%
-        const strongFN = fn.filter(d => d.strength === "strong" || d.strength === "intermediate");
-        const weakFN = fn.filter(d => d.strength === "weak");
-
-        const strongNear = strongFN.length > 0 && renSup && aldoRatio && aldoRatio > 0.6 && arrRatio && arrRatio > 0.6;
-        const weakNear = weakFN.length > 0 && renSup && aldoRatio && aldoRatio > 0.75 && arrRatio && arrRatio > 0.75;
-        const nearThreshold = !pos && (strongNear || weakNear);
-        const nearMeds = [...(strongNear ? strongFN : []), ...(weakNear ? weakFN : [])];
-        const clearlyNegative = (!pos && fn.length > 0) && !nearThreshold;
-
+      {/* ══ Results display ══ */}
+      {(()=>{
         return (<>
           {/* ── POSITIVE ── */}
           {pos&&(<>
@@ -1106,4 +1101,8 @@ function InterpretTool({mode="pcp"}){
 
     <p style={{fontSize:9,color:C.t3,textAlign:"center",marginTop:16}}>Adapted from: Adler GK et al., JCEM 2025. DOI:10.1210/clinem/dgaf284. Educational only.</p>
   </>;
+}
+
+export default function PA(){
+  return <ErrorBoundary><PAInner/></ErrorBoundary>;
 }
