@@ -114,7 +114,7 @@ function CopyNote({text}){
 
 // ═══════════════════════════════════════
 // ─── Feedback Widget ───
-const FORMSPREE_URL="https://formspree.io/f/YOUR_FORM_ID"; // Replace with your Formspree form ID
+const FEEDBACK_URL="https://script.google.com/a/macros/qmed.ca/s/AKfycbyLS6Lo7ZRHyY0OjyQEKSTxeiL5kG5IBLEvRWfuX6yuyvs3uKT0lfrlVxq69dE_iYdG/exec"; // Replace with your Google Apps Script web app URL
 
 function FeedbackWidget({currentPage}){
   const [open,setOpen]=useState(false);
@@ -125,13 +125,11 @@ function FeedbackWidget({currentPage}){
   function doSubmit(){
     if(!text.trim()) return;
     setStatus("sending");
-    fetch(FORMSPREE_URL,{
+    fetch(FEEDBACK_URL,{
       method:"POST",
-      headers:{"Content-Type":"application/json","Accept":"application/json"},
-      body:JSON.stringify({message:text,email:email||"(not provided)",page:currentPage||"landing",_subject:"PA Tool Feedback — "+(currentPage||"landing")})
-    }).then(r=>{
-      if(r.ok){setStatus("sent");setText("");setEmail("");setTimeout(()=>{setStatus("idle");setOpen(false);},2500);}
-      else setStatus("error");
+      body:JSON.stringify({message:text,email:email||"(not provided)",page:currentPage||"landing"})
+    }).then(()=>{
+      setStatus("sent");setText("");setEmail("");setTimeout(()=>{setStatus("idle");setOpen(false);},2500);
     }).catch(()=>setStatus("error"));
   }
 
@@ -178,18 +176,18 @@ function PAInner(){
           <Btn primary onClick={()=>setView("specialist")}>🏥  Specialists: Initial Consultation and Management</Btn>
           <Btn primary onClick={()=>setView("titrate")}>📈  Specialists: Titrate Medical Therapy</Btn>
           <Btn primary onClick={()=>setView("avsprep")}>🔬  Specialists: Prepare for Adrenal Vein Sampling</Btn>
-          <Btn disabled>🔪  Specialists: Prepare for Surgery</Btn>
-          <Btn disabled>📋  Specialists: Post-Adrenalectomy Follow-Up</Btn>
+          <Btn primary onClick={()=>setView("surgery")}>🔪  Specialists: Prepare for Surgery</Btn>
+          <Btn primary onClick={()=>setView("postadx")}>📋  Specialists: Post-Adrenalectomy Follow-Up</Btn>
         </div>
         <p style={{fontSize:10,color:C.t3,marginTop:18,lineHeight:1.5}}>Educational tool only. Not medical advice.<br/>Adapted from: Adler GK et al., JCEM 2025. DOI:10.1210/clinem/dgaf284</p>
       </div>
     </div>
   );
   const Header=()=><div style={{background:C.card,borderBottom:`1px solid ${C.bdr}`,padding:"9px 18px",display:"flex",alignItems:"center",justifyContent:"space-between",position:"sticky",top:0,zIndex:10}}>
-    <div style={{display:"flex",alignItems:"center",gap:8}}><span style={{fontSize:10,fontWeight:700,letterSpacing:1.5,color:C.acc,textTransform:"uppercase"}}>PA Tool</span><span style={{color:C.t3}}>·</span><span style={{fontSize:12,color:C.t2}}>{view==="screen"?"Primary Care: Should I Screen?":view==="specialist"?"Specialists: Initial Consultation & Management":view==="titrate"?"Specialists: Titrate Medical Therapy":view==="avsprep"?"Specialists: Prepare for AVS":"Primary Care: Interpret & Initial Management"}</span></div>
+    <div style={{display:"flex",alignItems:"center",gap:8}}><span style={{fontSize:10,fontWeight:700,letterSpacing:1.5,color:C.acc,textTransform:"uppercase"}}>PA Tool</span><span style={{color:C.t3}}>·</span><span style={{fontSize:12,color:C.t2}}>{view==="screen"?"Primary Care: Should I Screen?":view==="specialist"?"Specialists: Initial Consultation & Management":view==="titrate"?"Specialists: Titrate Medical Therapy":view==="avsprep"?"Specialists: Prepare for AVS":view==="postadx"?"Specialists: Post-Adrenalectomy":view==="surgery"?"Specialists: Prepare for Surgery":"Primary Care: Interpret & Initial Management"}</span></div>
     <Btn small onClick={()=>setView(null)}>← Menu</Btn>
   </div>;
-  const pageName=view==="screen"?"Should I Screen":view==="interpret"?"PCP Interpret & Manage":view==="specialist"?"Specialist Initial Consult":view==="titrate"?"Titrate Medical Therapy":view==="avsprep"?"Prepare for AVS":"Unknown";
+  const pageName=view==="screen"?"Should I Screen":view==="interpret"?"PCP Interpret & Manage":view==="specialist"?"Specialist Initial Consult":view==="titrate"?"Titrate Medical Therapy":view==="avsprep"?"Prepare for AVS":view==="surgery"?"Prepare for Surgery":view==="postadx"?"Post-Adrenalectomy Follow-Up":"Unknown";
   return(
     <div style={{minHeight:"100vh",background:C.bg,fontFamily:F,color:C.t1}}>
       <FeedbackWidget currentPage={pageName}/>
@@ -200,6 +198,8 @@ function PAInner(){
         {view==="specialist"&&<InterpretTool mode="specialist"/>}
         {view==="titrate"&&<TitrateTool/>}
         {view==="avsprep"&&<AVSPrepTool/>}
+        {view==="surgery"&&<PrepSurgeryTool/>}
+        {view==="postadx"&&<PostAdxTool/>}
       </div>
     </div>
   );
@@ -2271,6 +2271,717 @@ function AVSPrepTool(){
       <Btn small onClick={()=>{setPatSnap(null);setMedsSnap(null);setLabSnap(null);setWithdrawSnap(null);setCtSnap(null);setSbp("");setDbp("");setAge("");setSex("");setPatK("");setMedText("");setRV("");setAV("");setKV("");setEgD("");setCr("");setHasAdenoma("");setDstDone("");setDstValue("");setHighBPProceed("");}}>🔄 New Patient</Btn>
     </div>
     <p style={{fontSize:9,color:C.t3,textAlign:"center",marginTop:16}}>Adapted from: Adler GK et al., JCEM 2025. DOI:10.1210/clinem/dgaf284. Educational only.</p>
+  </>;
+}
+
+
+// ═══════════════════════════════════════
+// TOOL 7: POST-ADRENALECTOMY FOLLOW-UP
+// ═══════════════════════════════════════
+
+
+// ═══════════════════════════════════════
+// TOOL 6: PREPARE FOR SURGERY
+// ═══════════════════════════════════════
+
+// WHO DDD (mg/day) for PASO score calculation
+const WHO_DDD={
+  spironolactone:75,eplerenone:50,amlodipine:5,nifedipine:30,felodipine:5,diltiazem:240,verapamil:240,
+  lisinopril:10,enalapril:10,ramipril:2.5,perindopril:4,quinapril:15,captopril:50,trandolapril:2,benazepril:10,fosinopril:15,
+  losartan:50,valsartan:80,irbesartan:150,candesartan:8,telmisartan:40,olmesartan:20,azilsartan:40,
+  hydrochlorothiazide:25,chlorthalidone:25,indapamide:2.5,furosemide:40,bumetanide:1,torsemide:15,
+  metoprolol:150,atenolol:75,bisoprolol:10,carvedilol:37.5,propranolol:160,nebivolol:5,labetalol:600,nadolol:160,
+  doxazosin:4,prazosin:6,terazosin:5,clonidine:0.45,methyldopa:1000,hydralazine:100,minoxidil:10,
+  empagliflozin:17.5,dapagliflozin:10,canagliflozin:200,amiloride:5,triamterene:100
+};
+
+function calcDDD(meds){
+  let total=0;
+  for(const m of meds){
+    if(!m.detectedDose) continue;
+    const key=Object.keys(WHO_DDD).find(k=>m.name.toLowerCase().includes(k));
+    if(!key) continue;
+    const freqMult=m.detectedFreq==="BID"?2:m.detectedFreq==="TID"?3:m.detectedFreq==="QID"?4:1;
+    const dailyDose=m.detectedDose*freqMult;
+    total+=dailyDose/WHO_DDD[key];
+  }
+  return Math.round(total*100)/100;
+}
+
+function calcPASO(htnYrs,sex,bmi,totalDDD,tod,noduleMm){
+  const months=(parseFloat(htnYrs)||0)*12;
+  const pts={};
+  pts.htn=months<120?7.5:months<240?3.5:0;
+  pts.sex=sex==="F"?3:0;
+  const b=parseFloat(bmi)||0;
+  pts.bmi=b>0&&b<24?1.5:b>=24&&b<30?0.5:0;
+  pts.meds=totalDDD<3?6:totalDDD<9?3:0;
+  pts.tod=tod==="no"?3:0;
+  const n=parseFloat(noduleMm)||0;
+  pts.nodule=n>=20?4:n>=13?2:0;
+  const total=Object.values(pts).reduce((a,b)=>a+b,0);
+  return {pts,total};
+}
+
+function calcARS(htnYrs,sex,bmi,medCount){
+  const pts={};
+  pts.meds=medCount<=2?2:0;
+  pts.bmi=(parseFloat(bmi)||99)<=25?1:0;
+  pts.htn=(parseFloat(htnYrs)||99)<=6?1:0;
+  pts.sex=sex==="F"?1:0;
+  const total=Object.values(pts).reduce((a,b)=>a+b,0);
+  const level=total>=4?"High":total>=2?"Medium":"Low";
+  return {pts,total,level};
+}
+
+function subDays(dateStr,n){
+  if(!dateStr) return null;
+  const d=new Date(dateStr+"T12:00:00");
+  d.setDate(d.getDate()-n);
+  return d;
+}
+function fmtD(d){
+  if(!d) return "";
+  return d.toLocaleDateString("en-US",{weekday:"short",year:"numeric",month:"short",day:"numeric"});
+}
+
+function PrepSurgeryTool(){
+  // Section 1: Patient & Surgery Info
+  const [age,setAge]=useState("");
+  const [sex,setSex]=useState("");
+  const [side,setSide]=useState("");
+  const [surgDate,setSurgDate]=useState("");
+  const [htnYrs,setHtnYrs]=useState("");
+  const [bmi,setBmi]=useState("");
+  const [tod,setTod]=useState("");
+  const [noduleMm,setNoduleMm]=useState("");
+  const [patSnap,setPatSnap]=useState(null);
+
+  // Section 2: Clinical Data
+  const [sbp,setSbp]=useState("");
+  const [dbp,setDbp]=useState("");
+  const [kV,setKV]=useState("");
+  const [egfr,setEgfr]=useState("");
+  const [medText,setMedText]=useState("");
+  const [dataSnap,setDataSnap]=useState(null);
+
+  // Section 3: Score mode
+  const [useARS,setUseARS]=useState(false);
+
+  // Section 5: Checklist + accept
+  const [chkMRA,setChkMRA]=useState(false);
+  const [chkK,setChkK]=useState(false);
+  const [chkLabs,setChkLabs]=useState(false);
+  const [chkConsent,setChkConsent]=useState(false);
+  const [chkAnesthesia,setChkAnesthesia]=useState(false);
+  const [acceptChange,setAcceptChange]=useState("");
+  const [noteSnap,setNoteSnap]=useState(null);
+
+  // Computed
+  const sN=parseInt(sbp),dN=parseInt(dbp),kN=parseFloat(kV),egN=parseFloat(egfr);
+  const cParsed=useMemo(()=>parseMedList(medText),[medText]);
+  const canSubmitPat=age&&sex&&side&&htnYrs&&bmi&&tod&&noduleMm;
+  const canSubmitData=!isNaN(sN)&&sN>0&&!isNaN(dN)&&dN>0&&!isNaN(kN)&&!isNaN(egN);
+
+  function clearChecklist(){setChkMRA(false);setChkK(false);setChkLabs(false);setChkConsent(false);setChkAnesthesia(false);setAcceptChange("");setNoteSnap(null);}
+  function clearFromData(){setDataSnap(null);clearChecklist();}
+  function submitPat(){setPatSnap({age,sex,side,surgDate,htnYrs,bmi,tod,noduleMm});clearFromData();}
+
+  const dataFP=[sbp,dbp,kV,egfr,medText].join("|");
+  const [snapFP,setSnapFP]=useState("");
+  function submitData(){setSnapFP(dataFP);setDataSnap({sbp:sN,dbp:dN,kV:kN,egfr:egN,meds:[...cParsed]});clearChecklist();}
+  const dataChanged=dataSnap&&dataFP!==snapFP;
+
+  const ps=patSnap||{};
+  const ds=dataSnap||{};
+  const meds=dataSnap?ds.meds:cParsed;
+
+  const totalDDD=useMemo(()=>calcDDD(meds),[meds]);
+  const medCount=meds.length;
+  const hasMRA=meds.some(m=>m.cls==="mra");
+
+  const paso=useMemo(()=>patSnap?calcPASO(ps.htnYrs,ps.sex,ps.bmi,totalDDD,ps.tod,ps.noduleMm):null,[patSnap,totalDDD]);
+  const ars=useMemo(()=>patSnap?calcARS(ps.htnYrs,ps.sex,ps.bmi,medCount):null,[patSnap,medCount]);
+  const mraStopDate=useMemo(()=>subDays(ps.surgDate,2),[ps.surgDate]);
+
+  const pasoInterp=paso?(paso.total>20?{l:"High likelihood of complete clinical cure",c:C.g}:paso.total>16?{l:"Favorable — above cutoff for complete clinical success",c:C.g}:paso.total>10?{l:"Intermediate — below cutoff, partial/absent more likely",c:C.w}:{l:"Low likelihood of complete clinical cure",c:C.r}):null;
+  const arsInterp=ars?{l:`${ars.level} likelihood of cure (${ars.level==="High"?"~75%":ars.level==="Medium"?"~46%":"~27%"})`,c:ars.level==="High"?C.g:ars.level==="Medium"?C.w:C.r}:null;
+
+  // Render
+  return <>
+    <h2 style={{fontSize:17,fontWeight:700,color:C.wh,margin:"0 0 4px"}}>Specialists: Prepare for Surgery</h2>
+    <p style={{fontSize:11,color:C.t2,margin:"0 0 14px"}}>Pre-operative planning with PASO prediction score and surgical counseling.</p>
+
+    {/* Section 1: Patient & Surgery Info */}
+    <SectionHead number={1} title="Patient & Surgery Information" active={true}/>
+    <div style={{background:C.card,border:`1px solid ${C.bdr}`,borderRadius:9,padding:14,marginBottom:10}}>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:6,marginBottom:8}}>
+        <div><div style={{fontSize:10,color:C.t2,marginBottom:2}}>Age (years)</div><Inp value={age} onChange={setAge} placeholder="e.g. 52" type="number"/></div>
+        <div><div style={{fontSize:10,color:C.t2,marginBottom:2}}>Sex</div><Sel value={sex} onChange={setSex} ph="Select" options={[{v:"F",l:"Female"},{v:"M",l:"Male"}]}/></div>
+        <div><div style={{fontSize:10,color:C.t2,marginBottom:2}}>Planned side</div><Sel value={side} onChange={setSide} ph="Select" options={[{v:"Left",l:"Left"},{v:"Right",l:"Right"}]}/></div>
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:6,marginBottom:8}}>
+        <div><div style={{fontSize:10,color:C.t2,marginBottom:2}}>Surgery date</div><input type="date" value={surgDate} onChange={e=>setSurgDate(e.target.value)} style={{width:"100%",padding:"7px",borderRadius:6,border:`1px solid ${C.bdr}`,background:C.bg,color:C.t1,fontSize:12,fontFamily:F,outline:"none",boxSizing:"border-box"}}/></div>
+        <div><div style={{fontSize:10,color:C.t2,marginBottom:2}}>HTN duration (years)</div><Inp value={htnYrs} onChange={setHtnYrs} placeholder="e.g. 8" type="number"/></div>
+        <div><div style={{fontSize:10,color:C.t2,marginBottom:2}}>BMI (kg/m²)</div><Inp value={bmi} onChange={setBmi} placeholder="e.g. 27" type="number"/></div>
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6}}>
+        <div><div style={{fontSize:10,color:C.t2,marginBottom:2}}>Target organ damage (LVH / microalbuminuria)?</div>
+          <div style={{display:"flex",gap:5}}>{[{v:"no",l:"No — absent"},{v:"yes",l:"Yes — present"}].map(o=>(<button key={o.v} onClick={()=>setTod(o.v)} style={{flex:1,padding:"6px 0",borderRadius:5,border:`1px solid ${tod===o.v?C.acc:C.bdr}`,background:tod===o.v?C.accS:"transparent",color:tod===o.v?C.acc:C.t2,fontSize:11,fontWeight:600,fontFamily:F,cursor:"pointer"}}>{o.l}</button>))}</div>
+        </div>
+        <div><div style={{fontSize:10,color:C.t2,marginBottom:2}}>Largest nodule at imaging (mm)</div><Inp value={noduleMm} onChange={setNoduleMm} placeholder="e.g. 15" type="number"/></div>
+      </div>
+    </div>
+    {!patSnap&&<Btn primary onClick={submitPat} disabled={!canSubmitPat}>Continue</Btn>}
+    {patSnap&&<div style={{marginBottom:10}}><Btn small onClick={()=>{setPatSnap(null);clearFromData();}}>Edit Patient Info</Btn></div>}
+
+    {/* Section 2: Clinical Data & Medications */}
+    {patSnap&&(<>
+    <SectionHead number={2} title="Current Clinical Data & Medications" active={true}/>
+    <div style={{background:C.card,border:`1px solid ${C.bdr}`,borderRadius:9,padding:14,marginBottom:10}}>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:6,marginBottom:8}}>
+        <div><div style={{fontSize:10,color:C.t2,marginBottom:2}}>SBP (mmHg)</div><Inp value={sbp} onChange={setSbp} placeholder="140" type="number"/></div>
+        <div><div style={{fontSize:10,color:C.t2,marginBottom:2}}>DBP (mmHg)</div><Inp value={dbp} onChange={setDbp} placeholder="90" type="number"/></div>
+        <div><div style={{fontSize:10,color:C.t2,marginBottom:2}}>K⁺ (mmol/L)</div><Inp value={kV} onChange={setKV} placeholder="3.8" type="number"/></div>
+        <div><div style={{fontSize:10,color:C.t2,marginBottom:2}}>eGFR</div><Inp value={egfr} onChange={setEgfr} placeholder="85" type="number"/></div>
+      </div>
+      {kN<3.5&&!isNaN(kN)&&<Box type="warn" title={`K⁺ ${kV} mmol/L — Below Target`}>Correct hypokalemia to ≥3.5 mmol/L before surgery.</Box>}
+      {egN<30&&!isNaN(egN)&&<Box type="red" title="eGFR < 30">Refer to nephrology prior to surgery. MRA therapy should be deferred.</Box>}
+      <MedBox text={medText} onChange={setMedText} parsed={cParsed} label="Current antihypertensive medications"/>
+      {cParsed.length>0&&<div style={{marginTop:6,fontSize:10,color:C.acc}}>Total DDD: {calcDDD(cParsed).toFixed(2)} · {cParsed.length} agent{cParsed.length!==1?"s":""}{cParsed.some(m=>m.cls==="mra")?" · MRA detected":""}</div>}
+    </div>
+    {!dataSnap&&<Btn primary onClick={submitData} disabled={!canSubmitData}>Submit Clinical Data</Btn>}
+    {dataSnap&&dataChanged&&<div style={{background:C.card,border:`1px solid ${C.w}44`,borderRadius:8,padding:8,marginBottom:10,display:"flex",alignItems:"center",justifyContent:"space-between"}}><span style={{fontSize:11,color:C.w}}>⚠ Data changed.</span><Btn small primary onClick={()=>{submitData();}} style={{width:"auto"}}>Re-submit</Btn></div>}
+    </>)}
+
+    {/* Section 3: Prediction Score */}
+    {dataSnap&&(<>
+    <SectionHead number={3} title="Surgical Outcome Prediction" active={true}/>
+    <div style={{background:C.card,border:`1px solid ${C.bdr}`,borderRadius:9,padding:14,marginBottom:10}}>
+      <div style={{display:"flex",gap:5,marginBottom:10}}>
+        {[{v:false,l:"PASO Score (default)"},{v:true,l:"ARS (simplified)"}].map(o=>(<button key={String(o.v)} onClick={()=>setUseARS(o.v)} style={{flex:1,padding:"6px 0",borderRadius:5,border:`1px solid ${useARS===o.v?C.acc:C.bdr}`,background:useARS===o.v?C.accS:"transparent",color:useARS===o.v?C.acc:C.t2,fontSize:11,fontWeight:600,fontFamily:F,cursor:"pointer"}}>{o.l}</button>))}
+      </div>
+
+      {!useARS&&paso&&(<>
+        <div style={{fontSize:12,fontWeight:700,color:C.wh,marginBottom:6}}>PASO Prediction Score</div>
+        <div style={{fontSize:10,color:C.t3,marginBottom:8}}>Burrello et al., Ann Surg 2020. AUC 0.839, accuracy 79.2%.</div>
+        {/* Score bar */}
+        <div style={{marginBottom:10}}>
+          <div style={{display:"flex",justifyContent:"space-between",marginBottom:3}}>
+            <span style={{fontSize:11,color:C.t2}}>Score</span>
+            <span style={{fontSize:14,fontWeight:800,color:pasoInterp?.c||C.t1,fontFamily:M}}>{paso.total} <span style={{fontSize:10,fontWeight:500,color:C.t3}}>/ 25</span></span>
+          </div>
+          <div style={{position:"relative",height:14,background:C.bg,borderRadius:7,overflow:"hidden"}}>
+            <div style={{position:"absolute",left:0,top:0,height:"100%",width:`${(paso.total/25)*100}%`,background:pasoInterp?.c||C.acc,borderRadius:7,transition:"width 0.3s"}}/>
+            <div style={{position:"absolute",left:`${(16/25)*100}%`,top:-1,bottom:-1,width:2,background:C.t3}}/>
+          </div>
+          <div style={{fontSize:9,color:C.t3,marginTop:2,textAlign:"right"}}>Cutoff: &gt;16</div>
+        </div>
+        <div style={{fontSize:12,fontWeight:600,color:pasoInterp?.c||C.t1,marginBottom:8}}>{pasoInterp?.l}</div>
+        {/* Point breakdown */}
+        <div style={{background:C.bg,borderRadius:7,padding:10,border:`1px solid ${C.bdr}`}}>
+          {[
+            {l:"HTN Duration",v:`${Math.round((parseFloat(ps.htnYrs)||0)*12)} mo`,p:paso.pts.htn,max:7.5},
+            {l:"Sex",v:ps.sex==="F"?"Female":"Male",p:paso.pts.sex,max:3},
+            {l:"BMI",v:`${ps.bmi} kg/m²`,p:paso.pts.bmi,max:1.5},
+            {l:"Anti-HTN meds",v:`${totalDDD.toFixed(1)} DDD`,p:paso.pts.meds,max:6},
+            {l:"Target organ damage",v:ps.tod==="no"?"Absent":"Present",p:paso.pts.tod,max:3},
+            {l:"Nodule size",v:`${ps.noduleMm} mm`,p:paso.pts.nodule,max:4},
+          ].map((r,i)=>(<div key={i} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"3px 0",borderBottom:i<5?`1px solid ${C.bdr}22`:"none"}}>
+            <span style={{fontSize:10,color:C.t2}}>{r.l} <span style={{color:C.t3}}>({r.v})</span></span>
+            <span style={{fontSize:11,fontWeight:700,color:r.p>0?C.acc:C.t3,fontFamily:M}}>{r.p} <span style={{fontSize:9,fontWeight:400,color:C.t3}}>/ {r.max}</span></span>
+          </div>))}
+        </div>
+      </>)}
+
+      {useARS&&ars&&(<>
+        <div style={{fontSize:12,fontWeight:700,color:C.wh,marginBottom:6}}>Aldosteronoma Resolution Score</div>
+        <div style={{fontSize:10,color:C.t3,marginBottom:8}}>Zarnegar et al., Ann Surg 2008.</div>
+        <div style={{marginBottom:10}}>
+          <div style={{display:"flex",justifyContent:"space-between",marginBottom:3}}>
+            <span style={{fontSize:11,color:C.t2}}>Score</span>
+            <span style={{fontSize:14,fontWeight:800,color:arsInterp?.c||C.t1,fontFamily:M}}>{ars.total} <span style={{fontSize:10,fontWeight:500,color:C.t3}}>/ 5</span></span>
+          </div>
+          <div style={{position:"relative",height:14,background:C.bg,borderRadius:7,overflow:"hidden"}}>
+            <div style={{position:"absolute",left:0,top:0,height:"100%",width:`${(ars.total/5)*100}%`,background:arsInterp?.c||C.acc,borderRadius:7,transition:"width 0.3s"}}/>
+          </div>
+        </div>
+        <div style={{fontSize:12,fontWeight:600,color:arsInterp?.c||C.t1,marginBottom:8}}>{arsInterp?.l}</div>
+        <div style={{background:C.bg,borderRadius:7,padding:10,border:`1px solid ${C.bdr}`}}>
+          {[
+            {l:"≤2 medications",v:`${medCount} meds`,p:ars.pts.meds,max:2},
+            {l:"BMI ≤25",v:`${ps.bmi}`,p:ars.pts.bmi,max:1},
+            {l:"HTN ≤6 years",v:`${ps.htnYrs} yr`,p:ars.pts.htn,max:1},
+            {l:"Female sex",v:ps.sex==="F"?"Yes":"No",p:ars.pts.sex,max:1},
+          ].map((r,i)=>(<div key={i} style={{display:"flex",justifyContent:"space-between",padding:"3px 0",borderBottom:i<3?`1px solid ${C.bdr}22`:"none"}}>
+            <span style={{fontSize:10,color:C.t2}}>{r.l} <span style={{color:C.t3}}>({r.v})</span></span>
+            <span style={{fontSize:11,fontWeight:700,color:r.p>0?C.acc:C.t3,fontFamily:M}}>{r.p} <span style={{fontSize:9,fontWeight:400,color:C.t3}}>/ {r.max}</span></span>
+          </div>))}
+        </div>
+      </>)}
+    </div>
+    </>)}
+
+    {/* Section 4: Risk & Benefit Counseling */}
+    {dataSnap&&(<>
+    <SectionHead number={4} title="Surgical Risk & Expected Outcomes" active={true}/>
+    <div style={{background:C.card,border:`1px solid ${C.bdr}`,borderRadius:9,padding:14,marginBottom:10}}>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+        {[
+          {l:"Complication rate",v:"~5%",sub:"minor; <1% serious",c:C.g},
+          {l:"Biochemical cure",v:"~94%",sub:"K⁺ + ARR normalization",c:C.g},
+          {l:"Complete clinical cure",v:"~37%",sub:"BP normal, no meds",c:C.acc},
+          {l:"Clinical benefit",v:"~84%",sub:"complete + partial",c:C.acc},
+        ].map((r,i)=>(<div key={i} style={{background:C.bg,borderRadius:7,padding:10,textAlign:"center"}}>
+          <div style={{fontSize:18,fontWeight:800,color:r.c}}>{r.v}</div>
+          <div style={{fontSize:10,fontWeight:700,color:C.wh}}>{r.l}</div>
+          <div style={{fontSize:9,color:C.t3}}>{r.sub}</div>
+        </div>))}
+      </div>
+      <div style={{marginTop:8,fontSize:10,color:C.t3,lineHeight:1.5}}>Based on PASO international cohort (n=705). Complication data from systematic review of 1,056 patients. Conversion to open: 0–2%. Hospital stay: 1–2 days.</div>
+    </div>
+    </>)}
+
+    {/* Section 5: Pre-op Checklist */}
+    {dataSnap&&(<>
+    <SectionHead number={5} title="Pre-Operative Checklist" active={true}/>
+    <div style={{background:C.card,border:`1px solid ${C.bdr}`,borderRadius:9,padding:14,marginBottom:10}}>
+      {hasMRA&&mraStopDate&&<div style={{background:C.accS,border:`1px solid ${C.acc}44`,borderRadius:7,padding:10,marginBottom:10,fontSize:12,color:C.acc}}>
+        <strong>Stop MRA by {fmtD(mraStopDate)}</strong> (2 days before surgery on {ps.surgDate?fmtD(new Date(ps.surgDate+"T12:00:00")):""})
+      </div>}
+      {hasMRA&&!ps.surgDate&&<div style={{fontSize:11,color:C.w,marginBottom:8}}>MRA detected — enter surgery date above to calculate stop date.</div>}
+      {[
+        {s:chkMRA,f:setChkMRA,l:`Stop MRA ≥2 days before surgery${mraStopDate?" — by "+fmtD(mraStopDate):""}`},
+        {s:chkK,f:setChkK,l:`Confirm K⁺ ≥ 3.5 mmol/L${!isNaN(kN)?` (current: ${kV}${kN<3.5?" ⚠":""})`:""}`},
+        {s:chkLabs,f:setChkLabs,l:"Pre-op labs (CBC, BMP, coagulation, type & screen)"},
+        {s:chkConsent,f:setChkConsent,l:"Informed consent obtained"},
+        {s:chkAnesthesia,f:setChkAnesthesia,l:"Anesthesia pre-op clearance"},
+      ].map((item,i)=>(<Chk key={i} checked={item.s} onChange={item.f} label={item.l}/>))}
+    </div>
+
+    <div style={{background:C.card,border:`1px solid ${C.bdr}`,borderRadius:9,padding:14,marginBottom:10}}>
+      <div style={{fontSize:12,fontWeight:700,color:C.wh,marginBottom:6}}>Confirm Pre-Operative Plan?</div>
+      <div style={{display:"flex",gap:5}}>
+        {[{v:"yes",l:"Yes — confirm"},{v:"no",l:"No — defer"}].map(o=>(<button key={o.v} onClick={()=>{setAcceptChange(o.v);setNoteSnap(null);}} style={{flex:1,padding:"6px 0",borderRadius:5,border:`1px solid ${acceptChange===o.v?C.acc:C.bdr}`,background:acceptChange===o.v?C.accS:"transparent",color:acceptChange===o.v?C.acc:C.t2,fontSize:11,fontWeight:600,fontFamily:F,cursor:"pointer"}}>{o.l}</button>))}
+      </div>
+    </div>
+    {acceptChange&&!noteSnap&&<Btn primary onClick={()=>setNoteSnap({acceptChange})}>Generate Clinical Note</Btn>}
+    </>)}
+
+    {/* Clinical Note */}
+    {noteSnap&&(()=>{
+      const sexWord=ps.sex==="F"?"female":"male";
+      const medSummary=meds.length>0?meds.map(m=>`${m.name} ${m.detectedDose||"?"} ${m.unit} ${m.detectedFreq||m.freq}`).join(", "):"none";
+      const score=useARS?ars:paso;
+      const interp=useARS?arsInterp:pasoInterp;
+
+      let note=`Assessment:\nThis ${sexWord} patient (age ${ps.age}) with primary aldosteronism is being prepared for ${ps.side.toLowerCase()} laparoscopic adrenalectomy`;
+      if(ps.surgDate) note+=` scheduled for ${fmtD(new Date(ps.surgDate+"T12:00:00"))}`;
+      note+=`. Duration of hypertension is ${ps.htnYrs} years (${Math.round((parseFloat(ps.htnYrs)||0)*12)} months). BMI is ${ps.bmi} kg/m². Target organ damage (LVH/microalbuminuria) is ${ps.tod==="yes"?"present":"absent"}. Largest adrenal nodule measures ${ps.noduleMm} mm.`;
+      note+=`\n\nCurrent BP is ${ds.sbp}/${ds.dbp} mmHg. K⁺ is ${ds.kV} mmol/L. eGFR is ${Math.round(ds.egfr)} mL/min/1.73m². Current medications: ${medSummary}. Total DDD: ${totalDDD.toFixed(2)}.`;
+
+      if(!useARS&&paso){
+        note+=`\n\nPASO Prediction Score (Burrello et al., Ann Surg 2020): ${paso.total}/25.`;
+        note+=` HTN duration: ${paso.pts.htn} pts, sex: ${paso.pts.sex} pts, BMI: ${paso.pts.bmi} pts, anti-HTN meds (${totalDDD.toFixed(1)} DDD): ${paso.pts.meds} pts, target organ damage: ${paso.pts.tod} pts, nodule size: ${paso.pts.nodule} pts.`;
+        note+=` ${pasoInterp?.l||""}. Cutoff >16 for complete clinical success (AUC 0.839, accuracy 79.2%).`;
+      } else if(ars){
+        note+=`\n\nAldosteronoma Resolution Score (Zarnegar et al., Ann Surg 2008): ${ars.total}/5 (${ars.level} likelihood).`;
+      }
+
+      note+=`\n\nExpected surgical outcomes based on international cohort data: biochemical cure ~94%, complete clinical cure ~37%, clinical benefit (complete + partial) ~84%, complication rate ~5%.`;
+
+      if(ds.egfr<30) note+=` eGFR is below 30 — nephrology referral is recommended prior to surgery.`;
+      if(ds.kV<3.5) note+=` K⁺ is ${ds.kV} mmol/L — hypokalemia should be corrected to ≥3.5 before surgery.`;
+
+      note+=`\n\nPlan:\n`;
+      if(hasMRA&&mraStopDate) note+=`- Stop MRA by ${fmtD(mraStopDate)} (2 days before surgery)\n`;
+      if(ds.kV<3.5) note+=`- Correct hypokalemia to ≥3.5 mmol/L before surgery\n`;
+      if(ds.egfr<30) note+=`- Nephrology referral prior to surgery\n`;
+      note+=`- Pre-operative labs (CBC, BMP, coagulation, type & screen)\n`;
+      note+=`- Anesthesia pre-op clearance\n`;
+      note+=`- Informed consent with discussion of expected outcomes\n`;
+      note+=`- Proceed with ${ps.side.toLowerCase()} laparoscopic adrenalectomy`;
+      if(ps.surgDate) note+=` on ${fmtD(new Date(ps.surgDate+"T12:00:00"))}`;
+      note+=`\n- Post-operative follow-up with electrolytes, renin, and aldosterone at 6–12 months`;
+
+      return <CopyNote text={note}/>;
+    })()}
+
+    <div style={{textAlign:"center",marginTop:14}}>
+      <Btn small onClick={()=>{setPatSnap(null);clearFromData();setAge("");setSex("");setSide("");setSurgDate("");setHtnYrs("");setBmi("");setTod("");setNoduleMm("");setSbp("");setDbp("");setKV("");setEgfr("");setMedText("");setUseARS(false);}}>🔄 New Patient</Btn>
+    </div>
+    <p style={{fontSize:9,color:C.t3,textAlign:"center",marginTop:16}}>PASO Score: Burrello et al., Ann Surg 2020. ARS: Zarnegar et al., Ann Surg 2008. Educational only.</p>
+  </>;
+}
+
+function PostAdxTool(){
+  // ─── Section 1: Patient & Surgery Info ───
+  const [age,setAge]=useState("");
+  const [sex,setSex]=useState("");
+  const [adxSide,setAdxSide]=useState(""); // "left","right"
+  const [hadNodule,setHadNodule]=useState(""); // "yes","no"
+  const [noduleSize,setNoduleSize]=useState("");
+  const [adxMo,setAdxMo]=useState("");
+  const [adxYr,setAdxYr]=useState("");
+  const [demoSnap,setDemoSnap]=useState(null);
+  function submitDemo(){setDemoSnap({age,sex,adxSide,hadNodule,noduleSize:parseFloat(noduleSize)||null,adxMo,adxYr});}
+
+  // ─── Section 2: Baseline (pre-surgery, optional for PASO) ───
+  const [bMo,setBMo]=useState("");
+  const [bYr,setBYr]=useState("");
+  const [bSbp,setBSbp]=useState("");
+  const [bDbp,setBDbp]=useState("");
+  const [bRTid,setBRTid]=useState("pra_ng");
+  const [bRV,setBRV]=useState("");
+  const [bATid,setBATid]=useState("ia_ngdl");
+  const [bAV,setBAV]=useState("");
+  const [bKV,setBKV]=useState("");
+  const [bMedText,setBMedText]=useState("");
+
+  // ─── Current (mandatory) ───
+  const [cSbp,setCSbp]=useState("");
+  const [cDbp,setCDbp]=useState("");
+  const [cBpType,setCBpType]=useState("office");
+  const [cRTid,setCRTid]=useState("pra_ng");
+  const [cRV,setCRV]=useState("");
+  const [cATid,setCATid]=useState("ia_ngdl");
+  const [cAV,setCAV]=useState("");
+  const [cKV,setCKV]=useState("");
+  const [cEgM,setCEgM]=useState("direct");
+  const [cCrUnit,setCCrUnit]=useState("mg");
+  const [cCr,setCCr]=useState("");
+  const [cEgD,setCEgD]=useState("");
+  const [cMedText,setCMedText]=useState("");
+  const [dataSnap,setDataSnap]=useState(null);
+
+  // ─── Management ───
+  const [acceptChange,setAcceptChange]=useState("");
+  const [priorMRASE,setPriorMRASE]=useState("");
+  const [mgmtSnap,setMgmtSnap]=useState(null);
+
+  // ─── Computed ───
+  const cSN=parseInt(cSbp),cDN=parseInt(cDbp),cKN=parseFloat(cKV);
+  const ageN=parseInt(age);
+  const cCrMg=cCrUnit==="umol"&&cCr?parseFloat(cCr)/88.4:parseFloat(cCr);
+  const cEgC=cEgM==="auto"&&cCr&&age&&sex?calcEGFR(cCrMg,ageN,sex):null;
+  const egfr=cEgM==="direct"?parseFloat(cEgD):cEgC;
+
+  const cParsed=useMemo(()=>parseMedList(cMedText),[cMedText]);
+  const bParsed=useMemo(()=>parseMedList(bMedText),[bMedText]);
+
+  const hasBaseline=bSbp&&bKV;
+  const canSubmitData=!isNaN(cSN)&&cSN>0&&!isNaN(cDN)&&cDN>0&&!isNaN(cKN)&&(egfr!==null&&!isNaN(egfr));
+
+  const dataFingerprint=[cSbp,cDbp,cBpType,cRTid,cRV,cATid,cAV,cKV,cEgM,cCr,cCrUnit,cEgD,cMedText,bSbp,bDbp,bRTid,bRV,bATid,bAV,bKV,bMedText,bMo,bYr].join("|");
+  const [snapFingerprint,setSnapFingerprint]=useState("");
+
+  function clearMgmt(){setAcceptChange("");setPriorMRASE("");setMgmtSnap(null);}
+  function clearFromData(){setDataSnap(null);setSnapFingerprint("");clearMgmt();}
+
+  function submitData(){
+    const bRen=REN.find(r=>r.id===bRTid)||REN[0];
+    const bAld=ALD.find(a=>a.id===bATid)||ALD[0];
+    const cAld=ALD.find(a=>a.id===cATid)||ALD[0];
+    setSnapFingerprint(dataFingerprint);
+    setDataSnap({
+      b:hasBaseline?{mo:bMo,yr:bYr,sbp:parseInt(bSbp),dbp:parseInt(bDbp),rTid:bRTid,rV:parseFloat(bRV),aTid:bATid,aV:parseFloat(bAV),aToNg:bAld.toNg,kV:parseFloat(bKV),meds:[...bParsed]}:null,
+      c:{sbp:cSN,dbp:cDN,bpType:cBpType,rTid:cRTid,rV:parseFloat(cRV),aTid:cATid,aV:parseFloat(cAV),aToNg:cAld.toNg,kV:cKN,egfr,meds:[...cParsed]}
+    });
+  }
+  const dataChanged=dataSnap&&dataFingerprint!==snapFingerprint;
+
+  // Snapshot refs
+  const ds=dataSnap||{};
+  const cs=ds.c||{};
+  const bs=ds.b||null;
+  const meds=dataSnap?cs.meds:cParsed;
+
+  // Renin check
+  const cRen=REN.find(r=>r.id===(dataSnap?cs.rTid:cRTid))||REN[0];
+  const cRenSup=dataSnap&&cs.rV<=cRen.sup;
+
+  // MRA status
+  const currentMRA=meds.find(m=>m.cls==="mra");
+  const onMRA=!!currentMRA;
+  const bpHigh=cs.sbp>=130;
+
+  // ─── PASO Computation ───
+  function computePASO(){
+    if(!bs) return null;
+    const bKOk=!isNaN(bs.kV)&&bs.kV<3.5; // had baseline hypoK
+    const cKOk=cs.kV>=3.5;
+    const kCorrected=bKOk?cKOk:true; // if no baseline hypoK, met
+    const reninNorm=!cRenSup; // renin no longer suppressed
+
+    // Aldosterone reduction ≥50%
+    const bAldNg=bs.aV*bs.aToNg;
+    const cAldNg=cs.aV*cs.aToNg;
+    const aldoDrop=bAldNg>0?(1-cAldNg/bAldNg)*100:0;
+    const aldoHalved=aldoDrop>=50;
+
+    let biochem="absent";
+    if(kCorrected&&reninNorm) biochem="complete";
+    else if(kCorrected&&!reninNorm&&aldoHalved) biochem="partial";
+
+    // Clinical: count ALL anti-HTN meds (not MRA-specific like PAMO)
+    const bMedCount=bs.meds.length;
+    const cMedCount=meds.length;
+    const bpNorm=cs.sbp<130&&cs.dbp<80;
+    const sbpDrop=bs.sbp-cs.sbp;
+    const bpImproved=sbpDrop>=20;
+    const noMeds=cMedCount===0;
+    const fewerMeds=bMedCount>0&&cMedCount<bMedCount;
+
+    let clinical="absent";
+    if(bpNorm&&noMeds) clinical="complete";
+    else if(bpImproved||bpNorm||fewerMeds) clinical="partial";
+
+    return {biochem,clinical,kCorrected,reninNorm,aldoHalved,aldoDrop:Math.round(aldoDrop),bpNorm,bpImproved,sbpDrop,noMeds,fewerMeds,bMedCount,cMedCount,bKOk};
+  }
+  const paso=dataSnap&&bs?computePASO():null;
+  const pamoCols={complete:C.g,partial:C.w,absent:C.r};
+
+  function submitMgmt(){setMgmtSnap({acceptChange,priorMRASE});}
+
+  // ─── RENDER ───
+  return <>
+    <h2 style={{fontSize:17,fontWeight:700,color:C.wh,margin:"0 0 4px"}}>Specialists: Post-Adrenalectomy Follow-Up</h2>
+    <p style={{fontSize:11,color:C.t2,margin:"0 0 14px"}}>Assess surgical outcomes using PASO criteria and guide ongoing management.</p>
+
+    {/* Section 1: Patient & Surgery Info */}
+    <SectionHead number={1} title="Patient & Surgery Information" active={true}/>
+    <div style={{background:C.card,border:`1px solid ${C.bdr}`,borderRadius:9,padding:14,marginBottom:10}}>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6,marginBottom:8}}>
+        <div><div style={{fontSize:10,color:C.t2,marginBottom:2}}>Age range</div><Sel value={age} onChange={setAge} ph="Select..." options={[{v:"21",l:"18–24"},{v:"30",l:"25–34"},{v:"42",l:"35–49"},{v:"57",l:"50–64"},{v:"72",l:"65–79"},{v:"85",l:"80+"}]}/></div>
+        <div><div style={{fontSize:10,color:C.t2,marginBottom:2}}>Sex</div><Sel value={sex} onChange={setSex} ph="Select..." options={[{v:"M",l:"Male"},{v:"F",l:"Female"}]}/></div>
+      </div>
+      <div style={{fontSize:12,fontWeight:700,color:C.wh,marginBottom:6}}>Adrenalectomy Details</div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6,marginBottom:8}}>
+        <div><div style={{fontSize:10,color:C.t2,marginBottom:2}}>Side</div>
+          <div style={{display:"flex",gap:5}}>{[{v:"left",l:"Left"},{v:"right",l:"Right"}].map(o=>(<button key={o.v} onClick={()=>setAdxSide(o.v)} style={{flex:1,padding:"6px 0",borderRadius:5,border:`1px solid ${adxSide===o.v?C.acc:C.bdr}`,background:adxSide===o.v?C.accS:"transparent",color:adxSide===o.v?C.acc:C.t2,fontSize:11,fontWeight:600,fontFamily:F,cursor:"pointer"}}>{o.l}</button>))}</div>
+        </div>
+        <div><div style={{fontSize:10,color:C.t2,marginBottom:2}}>Nodule on pathology?</div>
+          <div style={{display:"flex",gap:5}}>{[{v:"yes",l:"Yes"},{v:"no",l:"No"}].map(o=>(<button key={o.v} onClick={()=>setHadNodule(o.v)} style={{flex:1,padding:"6px 0",borderRadius:5,border:`1px solid ${hadNodule===o.v?C.acc:C.bdr}`,background:hadNodule===o.v?C.accS:"transparent",color:hadNodule===o.v?C.acc:C.t2,fontSize:11,fontWeight:600,fontFamily:F,cursor:"pointer"}}>{o.l}</button>))}</div>
+        </div>
+      </div>
+      {hadNodule==="yes"&&<div style={{marginBottom:8}}><div style={{fontSize:10,color:C.t2,marginBottom:2}}>Nodule size (cm)</div><Inp value={noduleSize} onChange={setNoduleSize} placeholder="e.g. 1.5" type="number" style={{maxWidth:120}}/></div>}
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6}}>
+        <div><div style={{fontSize:10,color:C.t2,marginBottom:2}}>Month of surgery</div><Sel value={adxMo} onChange={setAdxMo} ph="Month" options={["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"].map((m,i)=>({v:String(i+1),l:m}))}/></div>
+        <div><div style={{fontSize:10,color:C.t2,marginBottom:2}}>Year of surgery</div><Inp value={adxYr} onChange={setAdxYr} placeholder="e.g. 2024" type="number"/></div>
+      </div>
+    </div>
+    {!demoSnap&&<Btn primary onClick={submitDemo} disabled={!age||!sex||!adxSide||!hadNodule||!adxMo||!adxYr}>Continue</Btn>}
+
+    {/* Section 2: Baseline & Current Data */}
+    {demoSnap&&(<>
+    <SectionHead number={2} title="Pre-Surgery Baseline & Current Data" active={true}/>
+    <div style={{display:"flex",gap:10,flexWrap:"wrap",marginBottom:10}}>
+      {/* LEFT: Baseline */}
+      <div style={{flex:"1 1 260px",background:C.card,border:`1px solid ${C.bdr}`,borderRadius:9,padding:12}}>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
+          <div style={{fontSize:12,fontWeight:700,color:C.wh}}>Pre-Surgery Baseline</div>
+          <Pill c={C.t2} bg={C.bdr+"55"}>for PASO</Pill>
+        </div>
+        <div style={{fontSize:10,color:C.t3,marginBottom:8}}>Fill to evaluate PASO outcomes.</div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:4,marginBottom:6}}>
+          <div><div style={{fontSize:9,color:C.t2,marginBottom:1}}>Month</div><Sel value={bMo} onChange={setBMo} ph="Month" options={["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"].map((m,i)=>({v:String(i+1),l:m}))}/></div>
+          <div><div style={{fontSize:9,color:C.t2,marginBottom:1}}>Year</div><Inp value={bYr} onChange={setBYr} placeholder="e.g. 2024" type="number"/></div>
+        </div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:4,marginBottom:6}}>
+          <div><div style={{fontSize:9,color:C.t2,marginBottom:1}}>SBP (mmHg)</div><Inp value={bSbp} onChange={setBSbp} placeholder="mmHg" type="number"/></div>
+          <div><div style={{fontSize:9,color:C.t2,marginBottom:1}}>DBP (mmHg)</div><Inp value={bDbp} onChange={setBDbp} placeholder="mmHg" type="number"/></div>
+        </div>
+        <LabInputs rTid={bRTid} setRTid={setBRTid} rV={bRV} setRV={setBRV} aTid={bATid} setATid={setBATid} aV={bAV} setAV={setBAV} kV={bKV} setKV={setBKV}/>
+        <MedBox text={bMedText} onChange={setBMedText} parsed={bParsed} label="Pre-surgery medications"/>
+      </div>
+
+      {/* RIGHT: Current */}
+      <div style={{flex:"1 1 260px",background:C.card,border:`1px solid ${C.acc}22`,borderRadius:9,padding:12}}>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
+          <div style={{fontSize:12,fontWeight:700,color:C.wh}}>Current Visit</div>
+          <Pill c={C.acc} bg={C.accS}>required</Pill>
+        </div>
+        <div style={{display:"flex",gap:4,marginBottom:6}}>
+          {["office","home"].map(t=>(<button key={t} onClick={()=>setCBpType(t)} style={{flex:1,padding:"4px 0",borderRadius:4,border:`1px solid ${cBpType===t?C.acc:C.bdr}`,background:cBpType===t?C.accS:"transparent",color:cBpType===t?C.acc:C.t2,fontSize:10,fontWeight:600,fontFamily:F,cursor:"pointer"}}>{t==="office"?"Office":"Home"}</button>))}
+        </div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:4,marginBottom:6}}>
+          <div><div style={{fontSize:9,color:C.t2,marginBottom:1}}>SBP (mmHg)</div><Inp value={cSbp} onChange={setCSbp} placeholder="mmHg" type="number"/></div>
+          <div><div style={{fontSize:9,color:C.t2,marginBottom:1}}>DBP (mmHg)</div><Inp value={cDbp} onChange={setCDbp} placeholder="mmHg" type="number"/></div>
+        </div>
+        <LabInputs rTid={cRTid} setRTid={setCRTid} rV={cRV} setRV={setCRV} aTid={cATid} setATid={setCATid} aV={cAV} setAV={setCAV} kV={cKV} setKV={setCKV}/>
+        <div style={{marginTop:6}}>
+          <div style={{fontSize:9,color:C.t2,marginBottom:1}}>eGFR</div>
+          <div style={{display:"flex",gap:3,marginBottom:3}}>
+            {["direct","auto"].map(m=>(<button key={m} onClick={()=>setCEgM(m)} style={{padding:"2px 6px",borderRadius:3,border:`1px solid ${cEgM===m?C.acc:C.bdr}`,background:cEgM===m?C.accS:"transparent",color:cEgM===m?C.acc:C.t2,fontSize:9,fontWeight:600,fontFamily:F,cursor:"pointer"}}>{m==="direct"?"eGFR":"From Cr"}</button>))}
+          </div>
+          {cEgM==="direct"?<Inp value={cEgD} onChange={setCEgD} placeholder="eGFR" type="number"/>:<>
+            <div style={{display:"flex",gap:3,marginBottom:2}}>
+              {[{v:"mg",l:"mg/dL"},{v:"umol",l:"µmol/L"}].map(u=>(<button key={u.v} onClick={()=>setCCrUnit(u.v)} style={{padding:"2px 5px",borderRadius:3,border:`1px solid ${cCrUnit===u.v?C.acc:C.bdr}`,background:cCrUnit===u.v?C.accS:"transparent",color:cCrUnit===u.v?C.acc:C.t2,fontSize:8,fontWeight:600,fontFamily:F,cursor:"pointer"}}>{u.l}</button>))}
+            </div>
+            <Inp value={cCr} onChange={setCCr} placeholder={cCrUnit==="mg"?"Cr":"µmol/L"} type="number"/>
+            {cEgC&&<div style={{fontSize:9,color:C.acc,marginTop:1}}>→ eGFR ≈ {cEgC}</div>}
+          </>}
+        </div>
+        <MedBox text={cMedText} onChange={setCMedText} parsed={cParsed} label="Current medications"/>
+      </div>
+    </div>
+    {!dataSnap&&<Btn primary onClick={submitData} disabled={!canSubmitData}>Submit & Assess</Btn>}
+    {dataSnap&&dataChanged&&<div style={{background:C.card,border:`1px solid ${C.w}44`,borderRadius:8,padding:8,marginBottom:10,display:"flex",alignItems:"center",justifyContent:"space-between"}}><span style={{fontSize:11,color:C.w}}>⚠ Data changed.</span><Btn small primary onClick={()=>{clearMgmt();submitData();}} style={{width:"auto"}}>Re-submit</Btn></div>}
+    </>)}
+
+    {/* Section 3: PASO Outcome */}
+    {dataSnap&&paso&&(<>
+    <SectionHead number={3} title="PASO Surgical Outcome" active={true}/>
+    <div style={{background:C.card,border:`1px solid ${C.bdr}`,borderRadius:9,padding:14,marginBottom:10}}>
+      <div style={{fontSize:10,color:C.t3,marginBottom:8}}>Based on PASO criteria (Williams et al., Lancet Diabetes Endocrinol 2017). Clinical success uses modified BP target of &lt;130/80 mmHg.</div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+        <div style={{background:C.bg,borderRadius:7,padding:10,border:`1px solid ${pamoCols[paso.biochem]}33`}}>
+          <div style={{fontSize:10,fontWeight:700,color:C.t2,textTransform:"uppercase",letterSpacing:.3,marginBottom:4}}>Biochemical</div>
+          <Pill c={pamoCols[paso.biochem]} bg={pamoCols[paso.biochem]+"18"}>{paso.biochem}</Pill>
+          <div style={{marginTop:6,fontSize:10,color:C.t2,lineHeight:1.5}}>
+            <div>{paso.kCorrected?"✅":"❌"} K⁺ corrected{paso.bKOk?"":" (was normal at baseline)"}</div>
+            <div>{paso.reninNorm?"✅":"❌"} Renin normalized</div>
+            {paso.biochem!=="complete"&&<div>{paso.aldoHalved?"✅":"❌"} Aldosterone ≥50% reduction ({paso.aldoDrop}%)</div>}
+          </div>
+        </div>
+        <div style={{background:C.bg,borderRadius:7,padding:10,border:`1px solid ${pamoCols[paso.clinical]}33`}}>
+          <div style={{fontSize:10,fontWeight:700,color:C.t2,textTransform:"uppercase",letterSpacing:.3,marginBottom:4}}>Clinical</div>
+          <Pill c={pamoCols[paso.clinical]} bg={pamoCols[paso.clinical]+"18"}>{paso.clinical}</Pill>
+          <div style={{marginTop:6,fontSize:10,color:C.t2,lineHeight:1.5}}>
+            <div>{paso.bpNorm?"✅":"❌"} BP &lt;130/80 (modified)</div>
+            <div>{paso.noMeds?"✅":"❌"} Off all antihypertensives</div>
+            {paso.clinical==="partial"&&<div style={{color:C.t3,marginTop:2}}>{paso.bpImproved?`SBP dropped ${paso.sbpDrop} mmHg`:paso.bpNorm?"BP at target but still on meds":`Fewer meds (${paso.bMedCount}→${paso.cMedCount})`}</div>}
+          </div>
+        </div>
+      </div>
+    </div>
+    </>)}
+
+    {/* Section 4: Management */}
+    {dataSnap&&(<>
+    <SectionHead number={paso?4:3} title="Post-Surgical Management" active={true}/>
+
+    {/* eGFR < 30 */}
+    {egfr!==null&&!isNaN(egfr)&&egfr<30&&(
+      <Box type="red" title="eGFR < 30">eGFR is below 30 mL/min/1.73m². <strong>Refer to nephrology</strong> for evaluation of kidney dysfunction. MRA therapy and further antihypertensive titration should be deferred pending nephrology input.</Box>
+    )}
+
+    {/* Renin status */}
+    {(egfr===null||isNaN(egfr)||egfr>=30)&&cRenSup&&(
+      <Box type="warn" title="Renin Remains Suppressed After Adrenalectomy">
+        Persistent renin suppression suggests ongoing autonomous aldosterone production. This may indicate residual or bilateral disease. {bpHigh?"Given SBP ≥130 mmHg, consider starting targeted MRA therapy.":"Blood pressure is currently controlled. Monitor closely and consider MRA therapy if BP rises."}
+      </Box>
+    )}
+    {(egfr===null||isNaN(egfr)||egfr>=30)&&!cRenSup&&!bpHigh&&(
+      <Box type="green" title="Renin Normalized, BP at Target">
+        Renin is no longer suppressed, consistent with biochemical remission. Blood pressure is below 130 mmHg systolic. Continue routine follow-up.
+      </Box>
+    )}
+    {(egfr===null||isNaN(egfr)||egfr>=30)&&!cRenSup&&bpHigh&&(
+      <Box type="info" title="Renin Normalized but BP Above Target">
+        Renin is no longer suppressed, suggesting the primary aldosteronism has been addressed surgically. Persistent hypertension is likely due to underlying essential hypertension. Consider uptitrating antihypertensive medications according to standard guidelines for essential hypertension.
+      </Box>
+    )}
+
+    {/* MRA recommendation for suppressed renin + high BP + eGFR ok */}
+    {(egfr!==null&&!isNaN(egfr)&&egfr>=30)&&cRenSup&&bpHigh&&(<div style={{background:C.card,border:`1px solid ${C.bdr}`,borderRadius:9,padding:14,marginBottom:10}}>
+      <div style={{fontSize:12,fontWeight:700,color:C.wh,marginBottom:6}}>Recommend: Start MRA therapy for persistent aldosteronism</div>
+      {!onMRA&&(<>
+        <div style={{marginBottom:8}}>
+          <div style={{fontSize:10,color:C.t2,marginBottom:2}}>Has the patient experienced prior side effects with MRAs?</div>
+          <div style={{display:"flex",gap:5}}>
+            {[{v:"no",l:"No"},{v:"yes",l:"Yes"}].map(o=>(<button key={o.v} onClick={()=>{setPriorMRASE(o.v);setAcceptChange("");setMgmtSnap(null);}} style={{flex:1,padding:"6px 0",borderRadius:5,border:`1px solid ${priorMRASE===o.v?C.acc:C.bdr}`,background:priorMRASE===o.v?C.accS:"transparent",color:priorMRASE===o.v?C.acc:C.t2,fontSize:11,fontWeight:600,fontFamily:F,cursor:"pointer"}}>{o.l}</button>))}
+          </div>
+        </div>
+        {priorMRASE==="no"&&<Box type="green" title="Start Spironolactone 12.5 mg daily">Check electrolytes and creatinine at 2 weeks.</Box>}
+        {priorMRASE==="yes"&&<Box type="info" title="Start Eplerenone 25 mg BID">Lower sexual side effect risk. Check electrolytes and creatinine at 2 weeks.</Box>}
+      </>)}
+      {onMRA&&<div style={{fontSize:12,color:C.t1}}>Patient is already on {currentMRA.name} {currentMRA.detectedDose||"?"} mg. Consider uptitration using the Titrate Medical Therapy tool.</div>}
+    </div>)}
+
+    {/* Accept */}
+    {(egfr!==null&&!isNaN(egfr)&&egfr<30)||((cRenSup&&bpHigh&&(priorMRASE||onMRA))||(!cRenSup&&bpHigh)||(!cRenSup&&!bpHigh))?(
+      <div style={{background:C.card,border:`1px solid ${C.bdr}`,borderRadius:9,padding:14,marginBottom:10}}>
+        <div style={{fontSize:12,fontWeight:700,color:C.wh,marginBottom:6}}>Accept Plan?</div>
+        <div style={{display:"flex",gap:5}}>
+          {[{v:"yes",l:"Yes — accept"},{v:"no",l:"No — defer"}].map(o=>(<button key={o.v} onClick={()=>{setAcceptChange(o.v);setMgmtSnap(null);}} style={{flex:1,padding:"6px 0",borderRadius:5,border:`1px solid ${acceptChange===o.v?C.acc:C.bdr}`,background:acceptChange===o.v?C.accS:"transparent",color:acceptChange===o.v?C.acc:C.t2,fontSize:11,fontWeight:600,fontFamily:F,cursor:"pointer"}}>{o.l}</button>))}
+        </div>
+        {acceptChange==="yes"&&<div style={{marginTop:6,fontSize:11,color:C.g}}>✅ Accepted.{(egfr>=30)&&cRenSup&&bpHigh?" Check lytes/Cr at 2 weeks.":""} Follow up in {(egfr<30)||cRenSup||bpHigh?"1–2 months":"4–6 months"}.</div>}
+        {acceptChange==="no"&&<div style={{marginTop:6,fontSize:11,color:C.t2}}>Deferred. Follow up in 4–6 months.</div>}
+      </div>
+    ):null}
+
+    {acceptChange&&!mgmtSnap&&<Btn primary onClick={submitMgmt}>Generate Clinical Note</Btn>}
+    </>)}
+
+    {/* Clinical Note */}
+    {mgmtSnap&&(()=>{
+      const sexWord=sex==="M"?"male":"female";
+      const ageLabel=age==="21"?"18-24":age==="30"?"25-34":age==="42"?"35-49":age==="57"?"50-64":age==="72"?"65-79":"80+";
+      const sideWord=demoSnap.adxSide==="left"?"left":"right";
+      const adxDate=demoSnap.adxMo?["","January","February","March","April","May","June","July","August","September","October","November","December"][parseInt(demoSnap.adxMo)]||"":"";
+      const medSummary=meds.length>0?meds.map(m=>`${m.name} ${m.detectedDose||"?"} ${m.unit} ${m.detectedFreq||m.freq}`).join(", "):"none";
+
+      let note=`Assessment:\nThis ${sexWord} patient (age ${ageLabel}) with primary aldosteronism is being seen for post-adrenalectomy follow-up. The patient underwent ${sideWord} adrenalectomy${adxDate||demoSnap.adxYr?` in ${adxDate}${demoSnap.adxYr?" "+demoSnap.adxYr:""}`:""}.`;
+      if(demoSnap.hadNodule==="yes") note+=` Pathology confirmed a${demoSnap.noduleSize?` ${demoSnap.noduleSize} cm`:""} nodule.`;
+      else note+=` No discrete nodule was identified on pathology.`;
+      note+=` Current BP is ${cs.sbp}/${cs.dbp} mmHg (${cs.bpType}). K⁺ is ${cs.kV} mmol/L. eGFR is ${Math.round(cs.egfr)} mL/min/1.73m². Current medications: ${medSummary}.`;
+      note+=` Renin is ${cs.rV} ${cRen.u} (${cRenSup?"suppressed":"no longer suppressed"}).`;
+
+      if(paso){
+        const bDate=bs.mo?["","January","February","March","April","May","June","July","August","September","October","November","December"][parseInt(bs.mo)]||"":"";
+        note+=`\n\nPASO Surgical Outcome Assessment (compared to pre-surgery baseline${bDate||bs.yr?` ${bDate}${bs.yr?" "+bs.yr:""}`:""}):\n`;
+        // Biochemical narrative
+        if(paso.biochem==="complete") note+=`The patient has achieved complete biochemical success. Renin has normalized and ${paso.bKOk?"hypokalemia has corrected":"potassium remains normal"}, consistent with remission of autonomous aldosterone production.`;
+        else if(paso.biochem==="partial") note+=`The patient has achieved partial biochemical success. ${paso.kCorrected?(paso.bKOk?"Hypokalemia has corrected":"Potassium remains normal"):"Hypokalemia persists"}, but renin remains suppressed. Aldosterone has decreased by ${paso.aldoDrop}% from baseline (≥50% reduction), suggesting significant but incomplete biochemical response.`;
+        else note+=`The patient has not achieved a meaningful biochemical response. Renin remains suppressed${paso.aldoHalved?", though aldosterone has decreased by "+paso.aldoDrop+"% from baseline":` and aldosterone has not decreased sufficiently (${paso.aldoDrop}% reduction, <50%)`}. This may indicate persistent or bilateral disease.`;
+
+        // Clinical narrative
+        if(paso.clinical==="complete") note+=` Clinically, the response is complete — blood pressure is below 130/80 mmHg without any antihypertensive medications.`;
+        else if(paso.clinical==="partial"){
+          note+=` Clinically, the response is partial — `;
+          if(paso.bpImproved&&paso.fewerMeds) note+=`systolic blood pressure has dropped by ${paso.sbpDrop} mmHg and the number of antihypertensives has been reduced from ${paso.bMedCount} to ${paso.cMedCount}.`;
+          else if(paso.bpImproved) note+=`systolic blood pressure has dropped by ${paso.sbpDrop} mmHg.`;
+          else if(paso.bpNorm&&!paso.noMeds) note+=`blood pressure has reached target (<130/80 mmHg), though the patient requires ${paso.cMedCount} antihypertensive${paso.cMedCount!==1?"s":""} to achieve this.`;
+          else if(paso.fewerMeds) note+=`the number of antihypertensives has been reduced from ${paso.bMedCount} to ${paso.cMedCount}.`;
+        }
+        else note+=` Clinically, there has been no improvement — blood pressure is the same or higher on the same or more antihypertensive medications.`;
+        note+=` (Note: clinical success assessed using a modified BP target of <130/80 mmHg rather than the original PASO threshold of <140/90 mmHg.)`;
+      }
+
+      // Management plan
+      const egLow=cs.egfr!==null&&!isNaN(cs.egfr)&&cs.egfr<30;
+      note+=`\n\nPlan:\n`;
+      if(acceptChange==="yes"){
+        if(egLow){
+          note+=`- eGFR is ${Math.round(cs.egfr)} mL/min/1.73m² — refer to nephrology for evaluation of kidney dysfunction\n`;
+          note+=`- Defer MRA therapy and further antihypertensive titration pending nephrology input\n`;
+          note+=`- Follow up in 1–2 months`;
+        } else if(cRenSup&&bpHigh){
+          if(!onMRA&&priorMRASE==="no") note+=`- Start spironolactone 12.5 mg daily for persistent aldosteronism\n- Check electrolytes and creatinine at 2 weeks\n`;
+          else if(!onMRA&&priorMRASE==="yes") note+=`- Start eplerenone 25 mg BID for persistent aldosteronism\n- Check electrolytes and creatinine at 2 weeks\n`;
+          else if(onMRA) note+=`- Continue current MRA therapy; consider uptitration\n`;
+          note+=`- Follow up in 1–2 months`;
+        } else if(!cRenSup&&bpHigh){
+          note+=`- Renin normalized — persistent hypertension likely reflects underlying essential hypertension\n`;
+          note+=`- Uptitrate antihypertensive medications according to standard hypertension guidelines\n`;
+          note+=`- Follow up in 1–2 months`;
+        } else {
+          note+=`- Continue routine follow-up\n`;
+          note+=`- Monitor blood pressure, electrolytes, and renin annually\n`;
+          note+=`- Follow up in 4–6 months`;
+        }
+      } else {
+        note+=`- Proposed changes deferred\n- Continue current regimen\n- Follow up in 4–6 months`;
+      }
+      return <CopyNote text={note}/>;
+    })()}
+
+    {/* Reset */}
+    <div style={{textAlign:"center",marginTop:14}}>
+      <Btn small onClick={()=>{setDemoSnap(null);clearFromData();setAge("");setSex("");setAdxSide("");setHadNodule("");setNoduleSize("");setAdxMo("");setAdxYr("");setBMo("");setBYr("");setBSbp("");setBDbp("");setBRTid("pra_ng");setBRV("");setBATid("ia_ngdl");setBAV("");setBKV("");setBMedText("");setCSbp("");setCDbp("");setCRTid("pra_ng");setCRV("");setCATid("ia_ngdl");setCAV("");setCKV("");setCEgD("");setCCr("");setCMedText("");}}>🔄 New Patient</Btn>
+    </div>
+    <p style={{fontSize:9,color:C.t3,textAlign:"center",marginTop:16}}>Adapted from: Williams TA et al., Lancet Diabetes Endocrinol 2017; Adler GK et al., JCEM 2025. Educational only.</p>
   </>;
 }
 
