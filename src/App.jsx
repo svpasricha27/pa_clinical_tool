@@ -1,5 +1,11 @@
 import { useState, useMemo, Component } from "react";
 
+// ─── Supabase Analytics ───
+const SUPA_URL="https://mhxsdawogycnlivoaudi.supabase.co";
+const SUPA_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1oeHNkYXdvZ3ljbmxpdm9hdWRpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ5NzE4MTQsImV4cCI6MjA5MDU0NzgxNH0.hLBsdrQye8Y7OzNSytHjxAjFR_hb9CgHaeLYU-5Dln4";
+function logData(table,data){try{fetch(SUPA_URL+"/rest/v1/"+table,{method:"POST",headers:{"Content-Type":"application/json","apikey":SUPA_KEY,"Authorization":"Bearer "+SUPA_KEY,"Prefer":"return=minimal"},body:JSON.stringify(data)});}catch(e){}}
+
+
 // ─── Error Boundary ───
 class ErrorBoundary extends Component {
   constructor(props){super(props);this.state={hasError:false,error:null};}
@@ -471,6 +477,7 @@ function ScreenTool(){
         } else {
           note+=`- Primary aldosteronism screening is not indicated at this time based on the clinical presentation`;
         }
+        logData("tool_screen",{age_range:sv.age,sex:sv.sex,bp_sbp:s,bp_dbp:d,bp_meds_count:String(nm),recommendation:rec.lev});
         return <CopyNote text={note}/>;
       })()}
     </div>)}
@@ -1148,6 +1155,7 @@ function InterpretTool({mode="pcp"}){
             note+=`- Rescreen if patient develops worsening or resistant hypertension, new spontaneous or diuretic-induced hypokalemia, or unexplained atrial fibrillation`;
           }
         }
+        logData(isSpec?"tool_specialist_consult":"tool_pcp_interpret",{age_range:_age,sex:_sex,renin_suppressed:renSup||false,aldo_elevated:aldHi||false,lateralization:lat?lat.lev:"none"});
         return <CopyNote text={note}/>;
       })()}
 
@@ -1765,6 +1773,7 @@ function TitrateTool(){
       } else {
         note+=`\n\nPlan:\n- Proposed changes deferred\n- Continue current regimen\n- Follow up in 4–6 months`;
       }
+      logData("tool_titrate",{age_range:age,sex:sex,current_sbp:cs.sbp,current_k:cs.kV,current_egfr:cs.egfr?Math.round(cs.egfr):null,on_mra:onMRA,med_count:meds.length,pamo_biochem:pamo?pamo.biochem:null,pamo_clinical:pamo?pamo.clinical:null,presyncope:sp,accepted:acceptChange});
       return <CopyNote text={note}/>;
     })()}
     </>)}
@@ -2264,6 +2273,7 @@ function AVSPrepTool(){
       }
       note+=`- Follow up in 1–2 months`;
 
+      logData("tool_avs_prep",{age_range:age,sex:sex,sbp:ps.sbp,potassium:ps.kV,renin_suppressed:renSup,med_count:meds.length,withdrawal_needed:!renSup,has_adenoma:ctSnap.hasAdenoma,dst_done:ctSnap.dstDone||null,dst_positive:ctSnap.dstPositive||null});
       return <CopyNote text={note}/>;
     })()}
     </>)}
@@ -2606,6 +2616,7 @@ function PrepSurgeryTool(){
       if(ps.surgDate) note+=` on ${fmtD(new Date(ps.surgDate+"T12:00:00"))}`;
       note+=`\n- Post-operative follow-up with electrolytes, renin, and aldosterone at 6–12 months`;
 
+      logData("tool_surgery_prep",{age:ps.age,sex:ps.sex,side:ps.side,htn_years:parseFloat(ps.htnYrs)||null,bmi:parseFloat(ps.bmi)||null,tod:ps.tod,nodule_mm:parseFloat(ps.noduleMm)||null,sbp:ds.sbp,potassium:ds.kV,egfr:ds.egfr?Math.round(ds.egfr):null,med_count:medCount,total_ddd:totalDDD,paso_score:paso?paso.total:null,ars_score:ars?ars.total:null,score_used:useARS?"ARS":"PASO"});
       return <CopyNote text={note}/>;
     })()}
 
@@ -2976,6 +2987,7 @@ function PostAdxTool(){
       } else {
         note+=`- Proposed changes deferred\n- Continue current regimen\n- Follow up in 4–6 months`;
       }
+      logData("tool_post_adx",{age_range:age,sex:sex,adx_side:demoSnap.adxSide,current_sbp:cs.sbp,current_k:cs.kV,renin_suppressed:cRenSup,med_count:meds.length,paso_biochem:paso?paso.biochem:null,paso_clinical:paso?paso.clinical:null,accepted:acceptChange});
       return <CopyNote text={note}/>;
     })()}
 
