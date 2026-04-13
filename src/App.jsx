@@ -586,6 +586,15 @@ function InterpretTool({mode="pcp"}){
   const allM=useMemo(()=>{const ids=new Set([...checked.map(d=>d.id),...parsed.map(d=>d.id)]);return DRUGS.filter(d=>ids.has(d.id));},[_mc,_mt]);
   const fp=allM.filter(d=>d.risk==="fp");
   const fn=allM.filter(d=>d.risk==="fn");
+  // Categorize FN meds by strength and proximity to threshold
+  const strongFN=fn.filter(d=>d.strength==="strong"||d.strength==="intermediate");
+  const weakFN=fn.filter(d=>d.strength==="weak");
+  // "Near threshold" means aldo or ARR is within 30% of cutoff (could be masked by FN meds)
+  const nearAldo=!isNaN(aN)&&ald.min&&aN>=ald.min*0.7&&aN<ald.min;
+  const nearARR=arrVal!==null&&arrTh&&arrVal>=arrTh*0.7&&arrVal<=arrTh;
+  const nearThreshold=renSup&&(nearAldo||nearARR);
+  const clearlyNegative=!renSup||(aN&&ald.min&&aN<ald.min*0.7)||(arrVal!==null&&arrTh&&arrVal<arrTh*0.7);
+  const nearMeds=nearThreshold?fn:[];
 
   const ageN=parseInt(_age);
   // eGFR: convert SI creatinine (µmol/L) to mg/dL for CKD-EPI
