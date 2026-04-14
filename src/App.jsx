@@ -586,6 +586,10 @@ function InterpretTool({mode="pcp"}){
   const allM=useMemo(()=>{const ids=new Set([...checked.map(d=>d.id),...parsed.map(d=>d.id)]);return DRUGS.filter(d=>ids.has(d.id));},[_mc,_mt]);
   const fp=allM.filter(d=>d.risk==="fp");
   const fn=allM.filter(d=>d.risk==="fn");
+  // FP threshold: if aldo is well above this, PA is likely despite FP meds
+  const fpHighThresh=ald.min*2;
+  const fpStronglyPositive=pos&&!isNaN(aN)&&aN>=fpHighThresh;
+  const fpWeaklyPositive=pos&&!isNaN(aN)&&aN<fpHighThresh;
   // Categorize FN meds by strength and proximity to threshold
   const strongFN=fn.filter(d=>d.strength==="strong"||d.strength==="intermediate");
   const weakFN=fn.filter(d=>d.strength==="weak");
