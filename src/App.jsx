@@ -60,15 +60,15 @@ function detectDrugs(text) {
 
 // ─── Renin/Aldo from Table 5 ───
 const REN = [
-  { id: "pra_ng", l: "PRA (ng/mL/h)", sup: 1, u: "ng/mL/h", isPRA: true, toStd: 1 },
-  { id: "pra_pmol", l: "PRA (pmol/L/min)", sup: 12.9, u: "pmol/L/min", isPRA: true, toStd: 1/12.9 },
-  { id: "pra_ngl", l: "PRA (ng/L/s)", sup: 0.28, u: "ng/L/s", isPRA: true, toStd: 1/0.28 },
-  { id: "drc_ngl", l: "DRC (ng/L)", sup: 5.2, u: "ng/L", isPRA: false, toStd: 1/5.2 },
-  { id: "drc_mu", l: "DRC (mU/L)", sup: 8.2, u: "mU/L", isPRA: false, toStd: 1/8.2 },
+  { id: "drc_ngl", l: "Direct Renin Concentration (ng/L)", sup: 5.2, u: "ng/L", isPRA: false, toStd: 1/5.2 },
+  { id: "drc_mu", l: "Direct Renin Concentration (mU/L)", sup: 8.2, u: "mU/L", isPRA: false, toStd: 1/8.2 },
+  { id: "pra_ng", l: "Plasma Renin Activity (ng/mL/h)", sup: 1, u: "ng/mL/h", isPRA: true, toStd: 1 },
+  { id: "pra_pmol", l: "Plasma Renin Activity (pmol/L/min)", sup: 12.9, u: "pmol/L/min", isPRA: true, toStd: 1/12.9 },
+  { id: "pra_ngl", l: "Plasma Renin Activity (ng/L/s)", sup: 0.28, u: "ng/L/s", isPRA: true, toStd: 1/0.28 },
 ];
 const ALD = [
-  { id: "ia_ngdl", l: "Immunoassay (ng/dL)", u: "ng/dL", isIA: true, min: 10, toNg: 1 },
   { id: "ia_pmol", l: "Immunoassay (pmol/L)", u: "pmol/L", isIA: true, min: 277, toNg: 1/27.7 },
+  { id: "ia_ngdl", l: "Immunoassay (ng/dL)", u: "ng/dL", isIA: true, min: 10, toNg: 1 },
   { id: "lcms_ngdl", l: "LC-MS/MS (ng/dL)", u: "ng/dL", isIA: false, min: 7.5, toNg: 1 },
   { id: "lcms_pmol", l: "LC-MS/MS (pmol/L)", u: "pmol/L", isIA: false, min: 208, toNg: 1/27.7 },
 ];
@@ -172,7 +172,8 @@ function FeedbackWidget({currentPage}){
 function PAInner(){
   const [view,setView]=useState(null);
   if(!view) return(
-    <div style={{minHeight:"100vh",background:C.bg,fontFamily:F,display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
+    <div style={{minHeight:"100vh",background:`radial-gradient(ellipse at 50% 20%, rgba(232,163,61,0.08) 0%, transparent 50%), radial-gradient(ellipse at 80% 70%, rgba(91,141,239,0.06) 0%, transparent 40%), radial-gradient(ellipse at 20% 80%, rgba(224,82,82,0.05) 0%, transparent 40%), ${C.bg}`,fontFamily:F,display:"flex",alignItems:"center",justifyContent:"center",padding:20,position:"relative",overflow:"hidden"}}>
+      <div style={{position:"absolute",top:0,left:0,right:0,bottom:0,opacity:0.04,backgroundImage:`url("data:image/svg+xml,%3Csvg width='400' height='200' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0,100 Q25,100 50,100 T100,100 Q110,100 115,80 Q120,20 125,100 Q130,180 135,120 Q140,100 150,100 T200,100 T250,100 Q260,100 265,80 Q270,20 275,100 Q280,180 285,120 Q290,100 300,100 T400,100' fill='none' stroke='%23E05252' stroke-width='2'/%3E%3C/svg%3E")`,backgroundRepeat:"repeat-x",backgroundPosition:"center",backgroundSize:"400px 200px",pointerEvents:"none"}}/>
       <FeedbackWidget currentPage="Landing"/>
       <div style={{maxWidth:480,width:"100%",textAlign:"center"}}>
         <div style={{fontSize:10,fontWeight:700,letterSpacing:2,color:C.acc,textTransform:"uppercase",marginBottom:8}}>Adapted from the 2025 Endocrine Society Guidelines</div>
@@ -184,10 +185,20 @@ function PAInner(){
           <Btn primary onClick={()=>setView("specialist")}>🏥  Specialists: Initial Consultation and Management</Btn>
           <Btn primary onClick={()=>setView("titrate")}>📈  Specialists: Titrate Medical Therapy</Btn>
           <Btn primary onClick={()=>setView("avsprep")}>🔬  Specialists: Prepare for Adrenal Vein Sampling</Btn>
-          <Btn primary onClick={()=>setView("surgery")}>🔪  Specialists: Prepare for Surgery</Btn>
+          <Btn primary onClick={()=>setView("surgery")}>⚕️  Specialists: Prepare for Surgery</Btn>
           <Btn primary onClick={()=>setView("postadx")}>📋  Specialists: Post-Adrenalectomy Follow-Up</Btn>
         </div>
-        <p style={{fontSize:10,color:C.t3,marginTop:18,lineHeight:1.5}}>Educational tool only. Not medical advice.<br/>Adapted from: Adler GK et al., JCEM 2025. DOI:10.1210/clinem/dgaf284</p>
+        <p style={{fontSize:10,color:C.t3,marginTop:18,lineHeight:1.5}}>Adapted from: Adler GK et al., JCEM 2025. DOI:10.1210/clinem/dgaf284</p>
+        <div style={{background:C.card,border:`1px solid ${C.bdr}`,borderRadius:8,padding:14,marginTop:14,textAlign:"left"}}>
+          <div style={{fontSize:11,fontWeight:700,color:C.w,marginBottom:6}}>⚖️ Medico-Legal Disclaimer</div>
+          <div style={{fontSize:10,color:C.t2,lineHeight:1.7}}>
+            This tool is intended for <strong style={{color:C.t1}}>educational and clinical decision-support purposes only</strong> and does not constitute medical advice, diagnosis, or treatment. It is designed to assist qualified healthcare professionals in interpreting screening results and considering management options for primary aldosteronism, in accordance with published guidelines.
+            <br/><br/>
+            Clinical decisions must always be made by a qualified healthcare provider based on the individual patient's clinical context, comorbidities, and preferences. The authors and developers of this tool accept <strong style={{color:C.t1}}>no liability</strong> for clinical outcomes arising from its use. Users are responsible for verifying all recommendations against current guidelines and institutional protocols before applying them to patient care.
+            <br/><br/>
+            By using this tool, you acknowledge that it is provided <strong style={{color:C.t1}}>"as is"</strong> without warranty, and that all clinical responsibility remains with the treating clinician.
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -197,7 +208,7 @@ function PAInner(){
   </div>;
   const pageName=view==="screen"?"Should I Screen":view==="interpret"?"PCP Interpret & Manage":view==="specialist"?"Specialist Initial Consult":view==="titrate"?"Titrate Medical Therapy":view==="avsprep"?"Prepare for AVS":view==="surgery"?"Prepare for Surgery":view==="postadx"?"Post-Adrenalectomy Follow-Up":"Unknown";
   return(
-    <div style={{minHeight:"100vh",background:C.bg,fontFamily:F,color:C.t1}}>
+    <div style={{minHeight:"100vh",background:`radial-gradient(ellipse at 50% 0%, rgba(232,163,61,0.04) 0%, transparent 40%), radial-gradient(ellipse at 90% 50%, rgba(91,141,239,0.03) 0%, transparent 30%), ${C.bg}`,fontFamily:F,color:C.t1}}>
       <FeedbackWidget currentPage={pageName}/>
       <Header/>
       <div style={{maxWidth:600,margin:"0 auto",padding:"18px 16px 40px"}}>
@@ -208,6 +219,9 @@ function PAInner(){
         {view==="avsprep"&&<AVSPrepTool/>}
         {view==="surgery"&&<PrepSurgeryTool/>}
         {view==="postadx"&&<PostAdxTool/>}
+        <div style={{marginTop:24,padding:"10px 12px",background:C.card,border:`1px solid ${C.bdr}`,borderRadius:7,textAlign:"center"}}>
+          <div style={{fontSize:9,color:C.t3,lineHeight:1.6}}>⚖️ <strong style={{color:C.t2}}>Disclaimer:</strong> Educational and clinical decision-support tool only — not medical advice. Clinical decisions remain the responsibility of the treating clinician. No liability is accepted for outcomes arising from use. See full disclaimer on the landing page.</div>
+        </div>
       </div>
     </div>
   );
@@ -490,9 +504,9 @@ function ScreenTool(){
 function InterpretTool({mode="pcp"}){
   const isSpec=mode==="specialist";
   const [phase,setPhase]=useState("input");
-  const [rTid,setRTid]=useState("pra_ng");
+  const [rTid,setRTid]=useState("drc_ngl");
   const [rV,setRV]=useState("");
-  const [aTid,setATid]=useState("ia_ngdl");
+  const [aTid,setATid]=useState("ia_pmol");
   const [aV,setAV]=useState("");
   const [kV,setKV]=useState("");
   const [mc,setMc]=useState({});
@@ -1333,9 +1347,9 @@ function TitrateTool(){
   const [bYr,setBYr]=useState("");
   const [bSbp,setBSbp]=useState("");
   const [bDbp,setBDbp]=useState("");
-  const [bRTid,setBRTid]=useState("pra_ng");
+  const [bRTid,setBRTid]=useState("drc_ngl");
   const [bRV,setBRV]=useState("");
-  const [bATid,setBATid]=useState("ia_ngdl");
+  const [bATid,setBATid]=useState("ia_pmol");
   const [bAV,setBAV]=useState("");
   const [bKV,setBKV]=useState("");
   const [bMedText,setBMedText]=useState("");
@@ -1344,9 +1358,9 @@ function TitrateTool(){
   const [cSbp,setCSbp]=useState("");
   const [cDbp,setCDbp]=useState("");
   const [cBpType,setCBpType]=useState("office");
-  const [cRTid,setCRTid]=useState("pra_ng");
+  const [cRTid,setCRTid]=useState("drc_ngl");
   const [cRV,setCRV]=useState("");
-  const [cATid,setCATid]=useState("ia_ngdl");
+  const [cATid,setCATid]=useState("ia_pmol");
   const [cAV,setCAV]=useState("");
   const [cKV,setCKV]=useState("");
   const [cEgM,setCEgM]=useState("direct");
@@ -1819,9 +1833,9 @@ function AVSPrepTool(){
   const [medsSnap,setMedsSnap]=useState(null);
 
   // ─── Section 3: Labs ───
-  const [rTid,setRTid]=useState("pra_ng");
+  const [rTid,setRTid]=useState("drc_ngl");
   const [rV,setRV]=useState("");
-  const [aTid,setATid]=useState("ia_ngdl");
+  const [aTid,setATid]=useState("ia_pmol");
   const [aV,setAV]=useState("");
   const [kV,setKV]=useState("");
   const [egM,setEgM]=useState("direct");
@@ -2657,9 +2671,9 @@ function PostAdxTool(){
   const [bYr,setBYr]=useState("");
   const [bSbp,setBSbp]=useState("");
   const [bDbp,setBDbp]=useState("");
-  const [bRTid,setBRTid]=useState("pra_ng");
+  const [bRTid,setBRTid]=useState("drc_ngl");
   const [bRV,setBRV]=useState("");
-  const [bATid,setBATid]=useState("ia_ngdl");
+  const [bATid,setBATid]=useState("ia_pmol");
   const [bAV,setBAV]=useState("");
   const [bKV,setBKV]=useState("");
   const [bMedText,setBMedText]=useState("");
@@ -2668,9 +2682,9 @@ function PostAdxTool(){
   const [cSbp,setCSbp]=useState("");
   const [cDbp,setCDbp]=useState("");
   const [cBpType,setCBpType]=useState("office");
-  const [cRTid,setCRTid]=useState("pra_ng");
+  const [cRTid,setCRTid]=useState("drc_ngl");
   const [cRV,setCRV]=useState("");
-  const [cATid,setCATid]=useState("ia_ngdl");
+  const [cATid,setCATid]=useState("ia_pmol");
   const [cAV,setCAV]=useState("");
   const [cKV,setCKV]=useState("");
   const [cEgM,setCEgM]=useState("direct");
