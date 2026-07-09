@@ -533,9 +533,10 @@ function InterpretTool({mode="pcp"}){
   const [specAvsDecision,setSpecAvsDecision]=useState(""); // "avs","medical" — for intermediate lateralization
   const [foregoAvs,setForegoAvs]=useState(""); // "direct_surgery","do_avs" — for young+hypoK+uni adenoma
   // FN medication decision state
-  const [fnAction,setFnAction]=useState(""); // specialist: "close","far"
-  const [fnEmpTreat,setFnEmpTreat]=useState(""); // specialist: "yes","no"
+  const [fnAction,setFnAction]=useState(""); // both tools: "close","far"
+  const [fnEmpTreat,setFnEmpTreat]=useState(""); // specialist: "withdraw","empiric","accept"
   const [pcpFnAction,setPcpFnAction]=useState(""); // pcp: "accept","refer"
+  const [fnSurgToggle,setFnSurgToggle]=useState(""); // Spec-1 only: "yes","no"
   const [fpDecision,setFpDecision]=useState(""); // specialist FP borderline: "accept_pa","withdraw_retest"
   const [fnReplaceMeds,setFnReplaceMeds]=useState({}); // selected replacement meds during withdrawal
   // Management snapshot (specialist only — gates next steps + clinical note on surgical decisions)
@@ -624,6 +625,14 @@ function InterpretTool({mode="pcp"}){
   const strongFN=fn.filter(d=>d.strength==="strong");
   const intermediateFN=fn.filter(d=>d.strength==="intermediate");
   const weakFN=fn.filter(d=>d.strength==="weak");
+  const strongOrIntFN=[...strongFN,...intermediateFN];
+  const hasStrongFN=strongOrIntFN.length>0; // groups strong + intermediate as "strong tier"
+  // Auto-classify close vs far: "close" if ANY parameter within 40% of its threshold
+  const renNearSup=!isNaN(rN)&&!renSup&&rN<ren.sup*1.4; // renin above cutoff but <1.4× cutoff
+  const aldNearMin=!isNaN(aN)&&!aldHi&&aN>=ald.min*0.6; // aldo below cutoff but ≥60% of cutoff
+  const arrNearTh=arrVal!==null&&arrTh&&!arrHi&&arrVal>=arrTh*0.6; // ARR below threshold but ≥60%
+  const autoClose=renNearSup||aldNearMin||arrNearTh;
+  const fnAutoSuggestion=autoClose?"close":"far";
 
   const ageN=parseInt(_age);
   // eGFR: convert SI creatinine (µmol/L) to mg/dL for CKD-EPI
@@ -1046,51 +1055,101 @@ function InterpretTool({mode="pcp"}){
             )}
 
             {/* ── FN MEDICATION LOGIC — only show when hypoK is NOT present ── */}
-            {fn.length > 0 && !hypoK && (
-              <div style={{background:C.card,border:`1px solid ${C.w}44`,borderRadius:8,padding:12,marginBottom:8,fontSize:12,color:C.t1,lineHeight:1.6}}>
+            {fn.length > 0 && !hypoK && (()=>{
+              const BtnFn=({v,label,sel,setSel,rec})=>{const isSelected=sel===v;const isRec=rec===v;const otherSelected=sel&&sel!==v;return(<button onClick={()=>setSel(v)} style={{flex:1,padding:"8px 4px",borderRadius:6,border:`1px solid ${isSelected?C.acc:isRec&&!otherSelected?"rgba(91,141,239,0.35)":C.bdr}`,background:isSelected?C.accS:isRec&&!otherSelected?"rgba(91,141,239,0.06)":"transparent",color:isSelected?C.acc:otherSelected?C.t3:isRec?"rgba(91,141,239,0.9)":C.t2,fontSize:10,fontWeight:600,fontFamily:F,cursor:"pointer",lineHeight:1.3,textAlign:"center"}}>{label}{isRec&&<div style={{fontSize:8,marginTop:2,opacity:otherSelected?0.5:0.8,color:otherSelected?C.t3:undefined}}>recommended</div>}</button>);};
+              // Determine scenario
+              const isStrong=hasStrongFN;
+              const isClose=fnAction==="close";
+              const isFar=fnAction==="far";
+              // PCP-3 auto-selects accept
+              const pcpAutoAccept=!isSpec&&isFar&&!isStrong;
+              if(pcpAutoAccept&&!pcpFnAction) setPcpFnAction("accept");
+
+              return (<div style={{background:C.card,border:`1px solid ${C.w}44`,borderRadius:8,padding:12,marginBottom:8,fontSize:12,color:C.t1,lineHeight:1.6}}>
                 <div style={{fontSize:11,fontWeight:700,color:C.w,textTransform:"uppercase",letterSpacing:.3,marginBottom:4}}>⚠ Interfering Medication Alert</div>
                 This patient's screen <strong>may be falsely negative</strong> due to the following interfering medications, which raise renin and/or lower aldosterone:
-                {strongFN.length > 0 && (<div style={{marginTop:4}}>• <strong>Strongly interfering:</strong> {strongFN.map(d=>d.label.split(" (")[0]).join(", ")} — significantly raise renin and/or lower aldosterone (4-week washout required)</div>)}
-                {intermediateFN.length > 0 && (<div style={{marginTop:2}}>• <strong>Intermediately interfering:</strong> {intermediateFN.map(d=>d.label.split(" (")[0]).join(", ")} — raise renin and aldosterone (4-week washout required)</div>)}
+                {strongOrIntFN.length > 0 && (<div style={{marginTop:4}}>• <strong>Strongly interfering:</strong> {strongOrIntFN.map(d=>d.label.split(" (")[0]).join(", ")} — significantly raise renin and/or lower aldosterone (4-week washout required)</div>)}
                 {weakFN.length > 0 && (<div style={{marginTop:2}}>• <strong>Weakly interfering:</strong> {weakFN.map(d=>d.label.split(" (")[0]).join(", ")} — modest effect on renin/aldosterone (2-week washout required)</div>)}
 
-                {/* ── SPECIALIST: close vs far decision ── */}
-                {isSpec && (<div style={{marginTop:10}}>
-                  <div style={{fontSize:11,fontWeight:700,color:C.wh,marginBottom:4}}>In your clinical judgment, are the values close to or far from PA diagnostic thresholds?</div>
+                {/* ── Step 1: Close vs Far (both tools) with auto-suggestion ── */}
+                <div style={{marginTop:10}}>
+                  <div style={{fontSize:11,fontWeight:700,color:C.wh,marginBottom:4}}>Are the values close to or far from PA diagnostic thresholds?</div>
+                  {!fnAction&&(<div style={{fontSize:10,color:C.t2,marginBottom:4,lineHeight:1.4}}>Based on the values entered, the tool suggests <strong style={{color:fnAutoSuggestion==="close"?C.w:C.g}}>{fnAutoSuggestion==="close"?"Close to PA thresholds":"Far from PA thresholds"}</strong>. You may override this assessment.</div>)}
                   <div style={{display:"flex",gap:5}}>
-                    {[{v:"close",l:"Close to PA thresholds"},{v:"far",l:"Far from PA thresholds"}].map(o=>(<button key={o.v} onClick={()=>{setFnAction(o.v);setFnEmpTreat("");}} style={{flex:1,padding:"7px 0",borderRadius:5,border:`1px solid ${fnAction===o.v?C.acc:C.bdr}`,background:fnAction===o.v?C.accS:"transparent",color:fnAction===o.v?C.acc:C.t2,fontSize:11,fontWeight:600,fontFamily:F,cursor:"pointer"}}>{o.l}</button>))}
+                    {[{v:"close",l:"Close to PA thresholds"},{v:"far",l:"Far from PA thresholds"}].map(o=>{const isSel=fnAction===o.v;const isSugg=fnAutoSuggestion===o.v;const otherSel=fnAction&&fnAction!==o.v;return(<button key={o.v} onClick={()=>{setFnAction(o.v);setFnEmpTreat("");setPcpFnAction(o.v==="far"&&!isStrong&&!isSpec?"accept":"");setFnSurgToggle("");}} style={{flex:1,padding:"7px 0",borderRadius:5,border:`1px solid ${isSel?C.acc:isSugg&&!otherSel?"rgba(91,141,239,0.35)":C.bdr}`,background:isSel?C.accS:isSugg&&!otherSel?"rgba(91,141,239,0.06)":"transparent",color:isSel?C.acc:otherSel?C.t3:isSugg?"rgba(91,141,239,0.9)":C.t2,fontSize:11,fontWeight:600,fontFamily:F,cursor:"pointer"}}>{o.l}{isSugg&&<span style={{fontSize:8,marginLeft:4,opacity:otherSel?0.5:0.8,color:otherSel?C.t3:undefined}}>(suggested)</span>}</button>);})}
                   </div>
+                </div>
 
-                  {fnAction==="close"&&(<div style={{marginTop:10,background:C.bg,borderRadius:7,padding:12,border:`1px solid ${C.w}33`}}>
-                    <div style={{fontSize:12,fontWeight:700,color:C.wh,marginBottom:6}}>Values close to PA thresholds — consider the following options:</div>
+                {/* ── Narrative guidance (adapts by tool + med strength + close/far) ── */}
+                {fnAction && (<div style={{marginTop:8,background:C.bg,borderRadius:7,padding:12,border:`1px solid ${C.bdr}`}}>
 
-                    <div style={{marginBottom:8}}>
-                      <div style={{fontSize:11,fontWeight:700,color:C.acc,marginBottom:4}}>Option 1: Withdraw interfering medications and retest</div>
-                      <div style={{fontSize:11,color:C.t1,lineHeight:1.6}}>
-                        <strong>Tiered withdrawal approach</strong> — withdraw the highest-tier medication present first:
-                        <ul style={{paddingLeft:16,margin:"4px 0 0"}}>
-                          {strongFN.length > 0 && (<li><strong>First priority — withdraw strongly interfering medications:</strong> {strongFN.map(d=>d.label.split(" (")[0]).join(", ")} (4-week washout). Maintain intermediate and weakly interfering medications.</li>)}
-                          {strongFN.length === 0 && intermediateFN.length > 0 && (<li><strong>Withdraw intermediately interfering medications:</strong> {intermediateFN.map(d=>d.label.split(" (")[0]).join(", ")} (4-week washout). Maintain weakly interfering medications.</li>)}
-                          {strongFN.length === 0 && intermediateFN.length === 0 && weakFN.length > 0 && (<li><strong>Withdraw weakly interfering medications:</strong> {weakFN.map(d=>d.label.split(" (")[0]).join(", ")} (2-week washout).</li>)}
-                        </ul>
+                  {/* ═══ SPECIALIST TOOL ═══ */}
+                  {isSpec && (<>
+                    {/* Spec-1: Strong + Close */}
+                    {isStrong && isClose && (<>
+                      <div style={{fontSize:11,color:C.t1,lineHeight:1.6,marginBottom:8}}>Strong interferors (e.g. MRAs, ENaC inhibitors, diuretics) can substantially mask primary aldosteronism. With values close to threshold, the next step depends on whether the patient is a potential surgical candidate.</div>
+                      <div style={{background:C.card,borderRadius:6,padding:10,marginBottom:10,border:`1px solid ${C.bdr}`}}>
+                        <div style={{fontSize:11,fontWeight:700,color:C.wh,marginBottom:4}}>Is this patient a potential surgical candidate and interested in surgery?</div>
+                        <div style={{display:"flex",gap:5}}>
+                          {[{v:"yes",l:"Yes — potential surgical candidate"},{v:"no",l:"No — not a surgical candidate"}].map(o=>(<button key={o.v} onClick={()=>{setFnSurgToggle(o.v);setFnEmpTreat("");}} style={{flex:1,padding:"6px 0",borderRadius:5,border:`1px solid ${fnSurgToggle===o.v?C.acc:C.bdr}`,background:fnSurgToggle===o.v?C.accS:"transparent",color:fnSurgToggle===o.v?C.acc:C.t2,fontSize:10,fontWeight:600,fontFamily:F,cursor:"pointer"}}>{o.l}</button>))}
+                        </div>
                       </div>
-                      <div style={{marginTop:4,fontSize:11,color:C.t2}}>Safe replacement agents if BP control is needed during washout: alpha-1 blockers (doxazosin, prazosin), non-DHP CCBs (verapamil SR, diltiazem), hydralazine, moxonidine.</div>
-                    </div>
+                      {fnSurgToggle==="yes"&&(<>
+                        <div style={{fontSize:11,color:C.t1,lineHeight:1.5,marginBottom:8}}>Confirming the diagnosis is important to guide surgical decision-making. <strong>Withdrawing interfering medications and retesting is recommended.</strong></div>
+                        <div style={{fontSize:11,fontWeight:700,color:C.wh,marginBottom:4}}>How would you like to proceed?</div>
+                        <div style={{display:"flex",gap:5}}>
+                          <BtnFn v="withdraw" label="Withdraw meds and retest" sel={fnEmpTreat} setSel={setFnEmpTreat} rec="withdraw"/>
+                          <BtnFn v="empiric" label="Empirically treat medically as PA" sel={fnEmpTreat} setSel={setFnEmpTreat} rec=""/>
+                          <BtnFn v="accept" label="Accept as negative for PA" sel={fnEmpTreat} setSel={setFnEmpTreat} rec=""/>
+                        </div>
+                      </>)}
+                      {fnSurgToggle==="no"&&(<>
+                        <div style={{fontSize:11,color:C.t1,lineHeight:1.5,marginBottom:8}}>Since surgery is not being pursued, confirming lateralization is less critical. <strong>Empiric medical treatment with spironolactone is a reasonable approach.</strong></div>
+                        <div style={{fontSize:11,fontWeight:700,color:C.wh,marginBottom:4}}>How would you like to proceed?</div>
+                        <div style={{display:"flex",gap:5}}>
+                          <BtnFn v="withdraw" label="Withdraw meds and retest" sel={fnEmpTreat} setSel={setFnEmpTreat} rec=""/>
+                          <BtnFn v="empiric" label="Empirically treat medically as PA" sel={fnEmpTreat} setSel={setFnEmpTreat} rec="empiric"/>
+                          <BtnFn v="accept" label="Accept as negative for PA" sel={fnEmpTreat} setSel={setFnEmpTreat} rec=""/>
+                        </div>
+                      </>)}
+                    </>)}
 
-                    <div style={{borderTop:`1px solid ${C.bdr}`,paddingTop:8}}>
-                      <div style={{fontSize:11,fontWeight:700,color:C.acc,marginBottom:4}}>Option 2: Empirically treat as primary aldosteronism</div>
-                      <div style={{fontSize:11,color:C.t1}}>If it is clinically unsafe to withdraw medications (e.g. severe or labile hypertension, heart failure), the provider may choose to empirically treat with an MRA (spironolactone) without confirmatory retesting.</div>
-                    </div>
-
-                    <div style={{marginTop:10}}>
+                    {/* Spec-2: Strong + Far */}
+                    {isStrong && isFar && (<>
+                      <div style={{fontSize:11,color:C.t1,lineHeight:1.6,marginBottom:8}}>PA is less likely but <strong>cannot be excluded</strong> when on strong interferors, particularly MRAs, as these can substantially suppress aldosterone and unsuppress renin. Consider withdrawing and retesting if the patient has features raising suspicion for PA (hypokalemia, OSA, resistant HTN, or age &lt;40). Empiric medical treatment with spironolactone is also reasonable.</div>
                       <div style={{fontSize:11,fontWeight:700,color:C.wh,marginBottom:4}}>How would you like to proceed?</div>
                       <div style={{display:"flex",gap:5}}>
-                        {[{v:"no",l:"Withdraw meds and retest"},{v:"yes",l:"Empirically treat as PA"}].map(o=>(<button key={o.v} onClick={()=>setFnEmpTreat(o.v)} style={{flex:1,padding:"7px 0",borderRadius:5,border:`1px solid ${fnEmpTreat===o.v?C.acc:C.bdr}`,background:fnEmpTreat===o.v?C.accS:"transparent",color:fnEmpTreat===o.v?C.acc:C.t2,fontSize:11,fontWeight:600,fontFamily:F,cursor:"pointer"}}>{o.l}</button>))}
+                        <BtnFn v="withdraw" label="Withdraw meds and retest" sel={fnEmpTreat} setSel={setFnEmpTreat} rec=""/>
+                        <BtnFn v="empiric" label="Empirically treat medically as PA" sel={fnEmpTreat} setSel={setFnEmpTreat} rec=""/>
+                        <BtnFn v="accept" label="Accept as negative for PA" sel={fnEmpTreat} setSel={setFnEmpTreat} rec=""/>
                       </div>
-                    </div>
+                    </>)}
 
-                    {fnEmpTreat==="no"&&(()=>{
-                      const medsToWithdraw=strongFN.length>0?strongFN:intermediateFN.length>0?intermediateFN:weakFN;
+                    {/* Spec-3: Weak + Far */}
+                    {!isStrong && isFar && (<>
+                      <div style={{fontSize:11,color:C.t1,lineHeight:1.6,marginBottom:8}}>Low probability of false negative. Weak interferors are unlikely to substantially mask primary aldosteronism when values are well below threshold. Retesting after withdrawal is only warranted if the patient wants a definitive answer or has features raising suspicion for PA (hypokalemia, OSA, resistant HTN, or age &lt;40).</div>
+                      <div style={{fontSize:11,fontWeight:700,color:C.wh,marginBottom:4}}>How would you like to proceed?</div>
+                      <div style={{display:"flex",gap:5}}>
+                        <BtnFn v="accept" label="Accept as negative for PA" sel={fnEmpTreat} setSel={setFnEmpTreat} rec="accept"/>
+                        <BtnFn v="withdraw" label="Withdraw meds and retest" sel={fnEmpTreat} setSel={setFnEmpTreat} rec=""/>
+                        <BtnFn v="empiric" label="Empirically treat medically as PA" sel={fnEmpTreat} setSel={setFnEmpTreat} rec=""/>
+                      </div>
+                    </>)}
+
+                    {/* Spec-4: Weak + Close */}
+                    {!isStrong && isClose && (<>
+                      <div style={{fontSize:11,color:C.t1,lineHeight:1.6,marginBottom:8}}>Values are close to PA thresholds and weak interferors could be contributing. Consider withdrawing and retesting, particularly if the patient has features raising suspicion for PA (hypokalemia, OSA, resistant HTN, or age &lt;40). Empiric medical treatment with spironolactone is also reasonable.</div>
+                      <div style={{fontSize:11,fontWeight:700,color:C.wh,marginBottom:4}}>How would you like to proceed?</div>
+                      <div style={{display:"flex",gap:5}}>
+                        <BtnFn v="withdraw" label="Withdraw meds and retest" sel={fnEmpTreat} setSel={setFnEmpTreat} rec=""/>
+                        <BtnFn v="empiric" label="Empirically treat medically as PA" sel={fnEmpTreat} setSel={setFnEmpTreat} rec=""/>
+                        <BtnFn v="accept" label="Accept as negative for PA" sel={fnEmpTreat} setSel={setFnEmpTreat} rec=""/>
+                      </div>
+                    </>)}
+
+                    {/* ── Specialist: outcome cards after button selection ── */}
+                    {fnEmpTreat==="withdraw"&&(()=>{
+                      const medsToWithdraw=strongOrIntFN.length>0?strongOrIntFN:weakFN;
                       const washout=medsToWithdraw.length>0&&(medsToWithdraw[0].strength==="weak"?2:4);
                       const SAFE_MEDS=[
                         {id:"dox",n:"Doxazosin",doses:["2 mg daily","4 mg daily"]},
@@ -1105,7 +1164,7 @@ function InterpretTool({mode="pcp"}){
                       <div style={{fontSize:11,color:C.t1,lineHeight:1.6,marginBottom:6}}>
                         <strong>Medications to withdraw this encounter:</strong>
                         <ul style={{paddingLeft:16,margin:"4px 0 0"}}>
-                          {medsToWithdraw.map(d=>(<li key={d.id}><strong>{d.label.split(" (")[0]}</strong> — {d.strength} interferor, {washout}-week washout</li>))}
+                          {medsToWithdraw.map(d=>(<li key={d.id}><strong>{d.label.split(" (")[0]}</strong> — {washout}-week washout</li>))}
                         </ul>
                       </div>
                       {!hasBP&&(<div style={{fontSize:11,color:C.w,marginTop:6}}>⚠ Please enter a blood pressure above to guide replacement medication decisions.</div>)}
@@ -1125,8 +1184,9 @@ function InterpretTool({mode="pcp"}){
                       </div>)}
                       <div style={{marginTop:8,fontSize:11,color:C.t2}}>After the {washout}-week washout period, repeat aldosterone and renin testing to confirm or exclude primary aldosteronism.</div>
                     </div>);})()}
-                    {fnEmpTreat==="yes"&&(<div style={{marginTop:10,background:"rgba(72,187,120,0.08)",border:`1px solid ${C.g}44`,borderRadius:7,padding:12}}>
-                      <div style={{fontSize:12,fontWeight:700,color:C.g,marginBottom:6}}>✅ Empirical PA Treatment</div>
+
+                    {fnEmpTreat==="empiric"&&(<div style={{marginTop:10,background:"rgba(72,187,120,0.08)",border:`1px solid ${C.g}44`,borderRadius:7,padding:12}}>
+                      <div style={{fontSize:12,fontWeight:700,color:C.g,marginBottom:6}}>✅ Empiric Medical PA Treatment</div>
                       {!hasBP&&(<div style={{fontSize:11,color:C.w}}>⚠ Please enter a blood pressure above to determine if spironolactone can be safely initiated.</div>)}
                       {hasBP&&sbpN>=130&&(<>
                         <div style={{fontSize:11,color:C.t1,marginBottom:4}}>SBP is {_bpSbp} mmHg ({_bpType}) — <strong>spironolactone can be initiated</strong>.</div>
@@ -1143,34 +1203,52 @@ function InterpretTool({mode="pcp"}){
                         SBP is {_bpSbp} mmHg ({_bpType}) — <strong>blood pressure is too low to safely initiate spironolactone</strong> at this time. Consider reducing other antihypertensives first or monitoring and initiating spironolactone once SBP is ≥130 mmHg.
                       </div>)}
                     </div>)}
-                  </div>)}
 
-                  {fnAction==="far"&&(<div style={{marginTop:10,background:C.bg,borderRadius:7,padding:12,border:`1px solid ${C.bdr}`}}>
-                    <div style={{fontSize:12,fontWeight:700,color:C.t2,marginBottom:4}}>Values far from PA thresholds</div>
-                    <div style={{fontSize:11,color:C.t1,lineHeight:1.5}}>Although the patient is on interfering medications, the results are well below diagnostic thresholds. <strong>Primary aldosteronism is unlikely</strong> even accounting for medication interference. Withdrawing medications to retest is not warranted at this time.</div>
-                  </div>)}
+                    {fnEmpTreat==="accept"&&(<div style={{marginTop:10,background:C.bg,borderRadius:7,padding:12,border:`1px solid ${C.bdr}`}}>
+                      <div style={{fontSize:12,fontWeight:700,color:C.t2,marginBottom:4}}>Accepted as negative for primary aldosteronism</div>
+                      <div style={{fontSize:11,color:C.t1,lineHeight:1.5}}>{hasStrongFN?"Although PA is less likely given values "+fnAction+" to threshold, it cannot be fully excluded when on strong interferors (particularly MRAs). If clinical suspicion changes, consider retesting after medication withdrawal.":"Low probability of false negative. Weak interferors are unlikely to substantially mask PA. Standard antihypertensive management should continue."}</div>
+                    </div>)}
+                  </>)}
+
+                  {/* ═══ PCP TOOL ═══ */}
+                  {!isSpec && (<>
+                    {/* PCP-1: Strong + Close */}
+                    {isStrong && isClose && (<div style={{fontSize:11,color:C.t1,lineHeight:1.6,marginBottom:8}}>Strong interferors (e.g. MRAs, ENaC inhibitors, diuretics) can substantially mask primary aldosteronism. With values close to threshold, <strong>specialist referral is strongly recommended</strong> to consider medication withdrawal and retesting, or empiric PA treatment.</div>)}
+                    {/* PCP-2: Strong + Far */}
+                    {isStrong && isFar && (<div style={{fontSize:11,color:C.t1,lineHeight:1.6,marginBottom:8}}>PA is less likely but <strong>cannot be excluded</strong> when on strong interferors, particularly MRAs, as these can substantially suppress aldosterone and unsuppress renin. Consider specialist referral, especially if the patient has hypokalemia, OSA, resistant HTN, or age &lt;40.</div>)}
+                    {/* PCP-3: Weak + Far */}
+                    {!isStrong && isFar && (<div style={{fontSize:11,color:C.t1,lineHeight:1.6,marginBottom:8}}>Low probability of false negative. PA is unlikely given weak interferors and values well below threshold. A false negative remains possible but the probability is low.</div>)}
+                    {/* PCP-4: Weak + Close */}
+                    {!isStrong && isClose && (<div style={{fontSize:11,color:C.t1,lineHeight:1.6,marginBottom:8}}>Values are close to PA thresholds and weak interferors could be contributing. Consider specialist referral, particularly if the patient has hypokalemia, OSA, resistant HTN, or age &lt;40.</div>)}
+
+                    <div style={{fontSize:11,fontWeight:700,color:C.wh,marginBottom:4}}>How would you like to proceed?</div>
+                    <div style={{display:"flex",gap:5}}>
+                      {isStrong&&isClose ? (<>
+                        <BtnFn v="refer" label="Refer to specialist" sel={pcpFnAction} setSel={setPcpFnAction} rec="refer"/>
+                        <BtnFn v="accept" label="Accept as negative for primary aldosteronism" sel={pcpFnAction} setSel={setPcpFnAction} rec=""/>
+                      </>) : !isStrong&&isFar ? (<>
+                        <BtnFn v="accept" label="Accept as negative for primary aldosteronism" sel={pcpFnAction} setSel={setPcpFnAction} rec="accept"/>
+                        <BtnFn v="refer" label="Refer to specialist" sel={pcpFnAction} setSel={setPcpFnAction} rec=""/>
+                      </>) : (<>
+                        <BtnFn v="refer" label="Refer to specialist" sel={pcpFnAction} setSel={setPcpFnAction} rec="refer"/>
+                        <BtnFn v="accept" label="Accept as negative for primary aldosteronism" sel={pcpFnAction} setSel={setPcpFnAction} rec=""/>
+                      </>)}
+                    </div>
+
+                    {pcpFnAction==="accept"&&(<div style={{marginTop:8,background:C.bg,borderRadius:7,padding:12,border:`1px solid ${C.bdr}`}}>
+                      <div style={{fontSize:12,fontWeight:700,color:C.t2,marginBottom:4}}>Accepted as negative for primary aldosteronism</div>
+                      <div style={{fontSize:11,color:C.t1,lineHeight:1.5}}>{hasStrongFN?"PA is less likely but cannot be fully excluded when on strong interferors, particularly MRAs. If clinical suspicion changes (e.g. worsening HTN, new hypokalemia, OSA diagnosed), consider specialist referral for medication withdrawal and retesting.":"Low probability of false negative. Weak interferors are unlikely to substantially mask PA. Standard antihypertensive management should continue."}</div>
+                    </div>)}
+                    {pcpFnAction==="refer"&&(<div style={{marginTop:8,background:C.bg,borderRadius:7,padding:12,border:`1px solid ${C.acc}33`}}>
+                      <div style={{fontSize:12,fontWeight:700,color:C.acc,marginBottom:4}}>📋 Referral to Specialist Recommended</div>
+                      <div style={{fontSize:11,color:C.t1,lineHeight:1.5}}>Given the presence of interfering medications and clinical suspicion for primary aldosteronism, specialist referral is recommended. The specialist can determine whether to:<br/>
+                      • <strong>Withdraw interfering medications</strong> under supervision and retest to confirm or exclude the diagnosis, or<br/>
+                      • <strong>Empirically treat</strong> with an MRA (spironolactone) if the patient is not a surgical candidate.</div>
+                    </div>)}
+                  </>)}
                 </div>)}
-
-                {/* ── PCP: accept vs refer decision ── */}
-                {!isSpec && (<div style={{marginTop:10}}>
-                  <div style={{fontSize:11,fontWeight:700,color:C.wh,marginBottom:4}}>How would you like to proceed?</div>
-                  <div style={{display:"flex",gap:5}}>
-                    {[{v:"accept",l:"Accept as negative — values far from threshold"},{v:"refer",l:"May have PA — refer to specialist"}].map(o=>(<button key={o.v} onClick={()=>setPcpFnAction(o.v)} style={{flex:1,padding:"7px 0",borderRadius:5,border:`1px solid ${pcpFnAction===o.v?C.acc:C.bdr}`,background:pcpFnAction===o.v?C.accS:"transparent",color:pcpFnAction===o.v?C.acc:C.t2,fontSize:11,fontWeight:600,fontFamily:F,cursor:"pointer"}}>{o.l}</button>))}
-                  </div>
-
-                  {pcpFnAction==="accept"&&(<div style={{marginTop:8,background:C.bg,borderRadius:7,padding:12,border:`1px solid ${C.bdr}`}}>
-                    <div style={{fontSize:12,fontWeight:700,color:C.t2,marginBottom:4}}>Accepted as negative</div>
-                    <div style={{fontSize:11,color:C.t1,lineHeight:1.5}}>The results are considered sufficiently below diagnostic thresholds to exclude primary aldosteronism despite the presence of interfering medications. Standard antihypertensive management should continue.</div>
-                  </div>)}
-                  {pcpFnAction==="refer"&&(<div style={{marginTop:8,background:C.bg,borderRadius:7,padding:12,border:`1px solid ${C.acc}33`}}>
-                    <div style={{fontSize:12,fontWeight:700,color:C.acc,marginBottom:4}}>📋 Referral to Specialist Recommended</div>
-                    <div style={{fontSize:11,color:C.t1,lineHeight:1.5}}>Given the presence of interfering medications and clinical suspicion for primary aldosteronism, specialist referral is recommended. The specialist can determine whether to:<br/>
-                    • <strong>Empirically treat</strong> with an MRA (spironolactone) if it is unsafe to withdraw medications, or<br/>
-                    • <strong>Withdraw interfering medications</strong> under supervision and retest to confirm or exclude the diagnosis.</div>
-                  </div>)}
-                </div>)}
-              </div>
-            )}
+              </div>);
+            })()}
 
             {/* Suppressed renin with borderline aldo, no FN meds */}
             {renSup && aldNg && ((ald.isIA && aldNg >= 5 && aldNg < 10) || (!ald.isIA && aldNg >= 3.75 && aldNg < 7.5)) && fn.length === 0 && !hypoK && (
@@ -1180,9 +1258,12 @@ function InterpretTool({mode="pcp"}){
               </div>
             )}
 
-            <div style={{background:C.bg,borderRadius:6,padding:10,fontSize:11,color:C.t2,lineHeight:1.5,border:`1px solid ${C.bdr}`,marginTop:6}}>
-              <strong style={{color:C.t1}}>Rescreen if:</strong> worsening/resistant HTN, new hypokalemia, or unexplained AFib.
-            </div>
+            {/* Only show rescreen advice when accepted as negative */}
+            {(fn.length===0 || (isSpec&&fnEmpTreat==="accept") || (!isSpec&&pcpFnAction==="accept")) && (
+              <div style={{background:C.bg,borderRadius:6,padding:10,fontSize:11,color:C.t2,lineHeight:1.5,border:`1px solid ${C.bdr}`,marginTop:6}}>
+                <strong style={{color:C.t1}}>Rescreen if:</strong> worsening/resistant HTN, new hypokalemia, or unexplained AFib.
+              </div>
+            )}
           </>)}
         </>);
       })()}
@@ -1194,9 +1275,11 @@ function InterpretTool({mode="pcp"}){
         if(pos&&isSpec&&latSnap&&lat&&(lat.lev==="high"||lat.lev==="intermediate")&&!mgmtSnap) return null;
         // For negative screen with FN meds: gate on decisions being made
         if(!pos&&fn.length>0&&!hypoK){
-          if(isSpec&&!fnAction) return null; // must pick close or far
-          if(isSpec&&fnAction==="close"&&!fnEmpTreat) return null; // must pick withdraw or empiric
-          if(!isSpec&&!pcpFnAction) return null; // must pick accept or refer
+          const isStrClFn=hasStrongFN&&fnAction==="close"; // Spec-1 scenario
+          if(!fnAction) return null; // must pick close or far (both tools)
+          if(isSpec&&isStrClFn&&!fnSurgToggle) return null; // Spec-1 must answer surgery toggle
+          if(isSpec&&!fnEmpTreat) return null; // specialist must pick withdraw/empiric/accept
+          if(!isSpec&&!pcpFnAction) return null; // PCP must pick accept or refer
         }
         const medList=allM.map(d=>d.label.split(" (")[0]).join(", ");
         const sexWord=_sex==="M"?"male":"female";
@@ -1358,21 +1441,20 @@ function InterpretTool({mode="pcp"}){
           
           if(fn.length>0){
             let fnMedDesc=[];
-            if(strongFN.length>0) fnMedDesc.push(`strongly interfering: ${strongFN.map(d=>d.label.split(" (")[0]).join(", ")}`);
-            if(intermediateFN.length>0) fnMedDesc.push(`intermediately interfering: ${intermediateFN.map(d=>d.label.split(" (")[0]).join(", ")}`);
+            if(strongOrIntFN.length>0) fnMedDesc.push(`strongly interfering: ${strongOrIntFN.map(d=>d.label.split(" (")[0]).join(", ")}`);
             if(weakFN.length>0) fnMedDesc.push(`weakly interfering: ${weakFN.map(d=>d.label.split(" (")[0]).join(", ")}`);
             note+=`The patient is on medications that can cause false-negative results (${fnMedDesc.join("; ")}). These medications raise renin and/or lower aldosterone, which may mask a true positive result. `;
             
-            if(isSpec&&fnAction==="close"&&fnEmpTreat==="yes"){
-              note+=`Given clinical judgment that the values are close to diagnostic thresholds and the risk of withdrawing medications, the decision has been made to empirically treat as primary aldosteronism. `;
-            } else if(isSpec&&fnAction==="close"&&fnEmpTreat==="no"){
-              note+=`Given clinical judgment that the values are close to diagnostic thresholds, the decision has been made to withdraw interfering medications and retest after appropriate washout. `;
-            } else if(isSpec&&fnAction==="far"){
-              note+=`However, in clinical judgment the values are well below diagnostic thresholds, making primary aldosteronism unlikely even accounting for medication interference. `;
+            if(isSpec&&fnEmpTreat==="empiric"){
+              note+=`Given clinical judgment that the values are ${fnAction} to diagnostic thresholds, the decision has been made to empirically treat as primary aldosteronism with spironolactone. `;
+            } else if(isSpec&&fnEmpTreat==="withdraw"){
+              note+=`Given clinical judgment that the values are ${fnAction} to diagnostic thresholds, the decision has been made to withdraw interfering medications and retest after appropriate washout. `;
+            } else if(isSpec&&fnEmpTreat==="accept"){
+              note+=hasStrongFN?`In clinical judgment, PA is less likely but cannot be fully excluded given strong interferors. The decision is to accept as negative at this time. `:`In clinical judgment, the probability of a false negative is low given weak interferors. The decision is to accept as negative. `;
             } else if(!isSpec&&pcpFnAction==="accept"){
-              note+=`In clinical judgment, the values are sufficiently below diagnostic thresholds to exclude primary aldosteronism despite the presence of interfering medications. `;
+              note+=hasStrongFN?`In clinical judgment, PA is less likely but cannot be fully excluded given strong interferors. Accepted as negative at this time. If clinical suspicion changes, specialist referral should be considered. `:`In clinical judgment, the probability of a false negative is low given weak interferors. Accepted as negative. `;
             } else if(!isSpec&&pcpFnAction==="refer"){
-              note+=`Given concern that interfering medications may be masking a true positive, specialist referral is recommended. `;
+              note+=`Given concern that interfering medications may be masking a true positive, specialist referral is recommended for medication withdrawal and retesting or empiric PA treatment. `;
             }
           }
           if(hypoK&&fn.length>0&&isSpec) note+=`Hypokalemia is present (K⁺ ${_kV} mmol/L), which can falsely lower aldosterone. The patient is also on interfering medications, but potassium correction should take priority before considering medication withdrawal. `;
@@ -1385,7 +1467,7 @@ function InterpretTool({mode="pcp"}){
             note+=`- Correct potassium to normal range\n`;
             note+=`- Repeat primary aldosteronism screening once potassium is corrected, as hypokalemia may have masked a true positive result`;
             if(fn.length>0&&isSpec) note+=`\n- Interfering medications noted but medication withdrawal deferred until potassium is corrected and screening is repeated`;
-          } else if(isSpec&&fn.length>0&&fnAction==="close"&&fnEmpTreat==="yes"){
+          } else if(isSpec&&fn.length>0&&fnEmpTreat==="empiric"){
             if(hasBP&&sbpN>=130){
               note+=`- Empirical treatment for primary aldosteronism: start spironolactone 12.5 mg daily (SBP ${_bpSbp} mmHg, safe to initiate)\n`;
               note+=`- Discontinue potassium supplements within 2 to 4 days of initiation\n`;
@@ -1400,8 +1482,8 @@ function InterpretTool({mode="pcp"}){
               note+=`- Empirical treatment for primary aldosteronism with spironolactone planned\n`;
               note+=`- Blood pressure to be assessed prior to initiation`;
             }
-          } else if(isSpec&&fn.length>0&&fnAction==="close"&&fnEmpTreat==="no"){
-            const medsW=strongFN.length>0?strongFN:intermediateFN.length>0?intermediateFN:weakFN;
+          } else if(isSpec&&fn.length>0&&fnEmpTreat==="withdraw"){
+            const medsW=strongOrIntFN.length>0?strongOrIntFN:weakFN;
             const wo=medsW.length>0&&(medsW[0].strength==="weak"?2:4);
             note+=`- Withdraw the following interfering medications: ${medsW.map(d=>d.label.split(" (")[0]).join(", ")} (${wo}-week washout)\n`;
             if(hasBP&&sbpN<120){
@@ -1416,20 +1498,24 @@ function InterpretTool({mode="pcp"}){
               }
             }
             note+=`- Repeat aldosterone and renin testing after ${wo}-week washout period`;
+          } else if(isSpec&&fn.length>0&&fnEmpTreat==="accept"){
+            note+=`- No primary aldosteronism-specific treatment indicated at this time\n`;
+            note+=hasStrongFN?`- If clinical suspicion changes (worsening HTN, new hypokalemia, OSA diagnosed), consider withdrawing interfering medications and retesting\n`:``;
+            note+=`- Rescreen if patient develops worsening or resistant hypertension, new spontaneous or diuretic-induced hypokalemia, or unexplained atrial fibrillation`;
           } else if(!isSpec&&fn.length>0&&pcpFnAction==="refer"){
-            note+=`- Refer to specialist for evaluation — specialist can either empirically treat with an MRA or withdraw interfering medications and retest\n`;
+            note+=`- Refer to specialist for evaluation — specialist can either withdraw interfering medications and retest, or empirically treat with an MRA\n`;
             note+=`- Continue current antihypertensive management in the interim`;
           } else {
             note+=`- No primary aldosteronism-specific treatment indicated at this time\n`;
             note+=`- Rescreen if patient develops worsening or resistant hypertension, new spontaneous or diuretic-induced hypokalemia, or unexplained atrial fibrillation`;
           }
         }
-        logData(isSpec?"tool_specialist_consult":"tool_pcp_interpret",{age_range:_age,sex:_sex,renin_suppressed:renSup||false,aldo_elevated:aldHi||false,arr_elevated:arrHi||false,screen_positive:pos||false,bp_sbp:_bpSbp||null,bp_dbp:_bpDbp||null,bp_type:_bpType||null,hypokalemia:hypoK||false,fp_meds:fp.length>0,fn_meds:fn.length>0,fn_strong:strongFN.map(d=>d.label.split(" (")[0]).join(", ")||null,fn_intermediate:intermediateFN.map(d=>d.label.split(" (")[0]).join(", ")||null,fn_weak:weakFN.map(d=>d.label.split(" (")[0]).join(", ")||null,fp_decision:fpDecision||null,fn_action:fnAction||null,fn_emp_treat:fnEmpTreat||null,pcp_fn_action:pcpFnAction||null,fn_replace_meds:Object.entries(fnReplaceMeds).filter(([k,v])=>v).length>0?JSON.stringify(fnReplaceMeds):null,lateralization:lat?lat.lev:"none"});
+        logData(isSpec?"tool_specialist_consult":"tool_pcp_interpret",{age_range:_age,sex:_sex,renin_suppressed:renSup||false,aldo_elevated:aldHi||false,arr_elevated:arrHi||false,screen_positive:pos||false,bp_sbp:_bpSbp||null,bp_dbp:_bpDbp||null,bp_type:_bpType||null,hypokalemia:hypoK||false,fp_meds:fp.length>0,fn_meds:fn.length>0,fn_strong:strongOrIntFN.map(d=>d.label.split(" (")[0]).join(", ")||null,fn_weak:weakFN.map(d=>d.label.split(" (")[0]).join(", ")||null,fp_decision:fpDecision||null,fn_action:fnAction||null,fn_emp_treat:fnEmpTreat||null,fn_surg_toggle:fnSurgToggle||null,pcp_fn_action:pcpFnAction||null,fn_replace_meds:Object.entries(fnReplaceMeds).filter(([k,v])=>v).length>0?JSON.stringify(fnReplaceMeds):null,lateralization:lat?lat.lev:"none"});
         return <CopyNote text={note}/>;
       })()}
 
       <div style={{textAlign:"center",marginTop:14}}>
-        <Btn small onClick={()=>{setPhase("input");setSnap(null);setLatSnap(null);setMgmtSnap(null);setRV("");setAV("");setKV("");setBpSbp("");setBpDbp("");setBpType("office");setAdnStatus("");setAdnSzMain("");setAdnSzLeft("");setCr("");setEgD("");setAge("");setSex("");setResHTN(false);setSurgCandidate("");setSurgInterest("");setSpecAvsDecision("");setForegoAvs("");setFnAction("");setFnEmpTreat("");setPcpFnAction("");setFpDecision("");setFnReplaceMeds({});}}>🔄 New Patient</Btn>
+        <Btn small onClick={()=>{setPhase("input");setSnap(null);setLatSnap(null);setMgmtSnap(null);setRV("");setAV("");setKV("");setBpSbp("");setBpDbp("");setBpType("office");setAdnStatus("");setAdnSzMain("");setAdnSzLeft("");setCr("");setEgD("");setAge("");setSex("");setResHTN(false);setSurgCandidate("");setSurgInterest("");setSpecAvsDecision("");setForegoAvs("");setFnAction("");setFnEmpTreat("");setPcpFnAction("");setFnSurgToggle("");setFpDecision("");setFnReplaceMeds({});}}>🔄 New Patient</Btn>
       </div>
     </div>}
 
