@@ -1287,7 +1287,7 @@ function InterpretTool({mode="pcp"}){
         const fpList=fp.map(d=>d.label.split(" (")[0]).join(", ");
         const fnList=fn.map(d=>d.label.split(" (")[0]).join(", ");
         
-        let note=`Assessment:\nThis ${sexWord} patient (age ${ageLabel}) was screened for primary aldosteronism. Screening labs showed a renin of ${_rV} ${ren.u} (suppressed ≤${ren.sup}), aldosterone of ${_aV} ${ald.u} (elevated ≥${ald.min}), and an aldosterone-to-renin ratio (ARR) of ${arrVal?.toFixed(1)??"—"} (elevated >${arrTh}). Potassium was ${_kV} mmol/L. `;
+        let note=`Assessment:\nThis ${sexWord} patient (age ${ageLabel}) was screened for primary aldosteronism. Screening labs showed a renin of ${_rV} ${ren.u} (${renSup?"suppressed":"not suppressed"}; cutoff ≤${ren.sup}), aldosterone of ${_aV} ${ald.u} (${aldHi?"elevated":"not elevated"}; cutoff ≥${ald.min}), and an aldosterone-to-renin ratio (ARR) of ${arrVal?.toFixed(1)??"—"} (${arrHi?"elevated":"not elevated"}; cutoff >${arrTh}). Potassium was ${_kV} mmol/L. `;
         if(medList) note+=`The patient is on the following relevant medications: ${medList}. `;
 
         if(pos){
