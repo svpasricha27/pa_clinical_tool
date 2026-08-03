@@ -488,7 +488,7 @@ function ScreenTool(){
           note+=`- Order serum aldosterone, renin (PRA or DRC), and potassium to screen for primary aldosteronism\n`;
           note+=`- Screen on current medications; interpret results accounting for potential medication interference`;
           if(intent==="yes") note+=`\n- Decision to pursue screening confirmed`;
-          if(intent==="no") note+=`\n- Screening deferred at this time; will rescreen if patient develops worsening or resistant hypertension, new hypokalemia, or unexplained atrial fibrillation`;
+          if(intent==="no") note+=`\n- Screening deferred at this time; will rescreen if patient develops worsening or resistant hypertension, new hypokalemia, unexplained atrial fibrillation, or first-degree relative identified with primary aldosteronism`;
         } else {
           note+=`- Primary aldosteronism screening is not indicated at this time based on the clinical presentation`;
         }
@@ -767,15 +767,34 @@ function InterpretTool({mode="pcp"}){
 
             {/* Secondary notes — medication & K⁺ — lighter styling */}
             {fn.length > 0 && pos && (
-              <div style={{background:C.card,border:`1px solid ${C.g}44`,borderRadius:8,padding:12,marginBottom:8,fontSize:12,color:C.t1,lineHeight:1.6}}>
-                <div style={{fontSize:11,fontWeight:700,color:C.g,textTransform:"uppercase",letterSpacing:.3,marginBottom:4}}>✅ Strengthened by Medication Context</div>
-                This patient screened positive for primary aldosteronism <strong>despite being on medications that can cause false-negative results</strong> (i.e. medications that raise renin and/or lower aldosterone, which would push the screen toward negative). This strengthens confidence in the diagnosis, as the true aldosterone-to-renin ratio may be even higher than measured.
-                <div style={{marginTop:6,fontSize:11,color:C.t2}}>
-                  Interfering medications:
-                  {strongFN.length > 0 && <span> <strong>Strongly interfering:</strong> {strongFN.map(d=>d.label.split(" (")[0]).join(", ")}.</span>}
-                  {intermediateFN.length > 0 && <span> <strong>Intermediately interfering:</strong> {intermediateFN.map(d=>d.label.split(" (")[0]).join(", ")}.</span>}
-                  {weakFN.length > 0 && <span> <strong>Weakly interfering:</strong> {weakFN.map(d=>d.label.split(" (")[0]).join(", ")}.</span>}
-                </div>
+              <div style={{background:C.card,border:`1px solid ${fp.length>0?C.w:C.g}44`,borderRadius:8,padding:12,marginBottom:8,fontSize:12,color:C.t1,lineHeight:1.6}}>
+                {fp.length > 0 ? (<>
+                  <div style={{fontSize:11,fontWeight:700,color:C.w,textTransform:"uppercase",letterSpacing:.3,marginBottom:4}}>⚠ Mixed Medication Context</div>
+                  This patient is on <strong>both false-negative and false-positive medications</strong>, which have opposing effects on the screening result. The medication context could either strengthen or weaken the diagnostic clarity of this positive screen.
+                  <div style={{marginTop:8,background:C.bg,borderRadius:6,padding:10,border:`1px solid ${C.g}33`}}>
+                    <div style={{fontSize:11,fontWeight:700,color:C.g,marginBottom:4}}>False-negative medications (strengthen the result)</div>
+                    <div style={{fontSize:11,color:C.t1,lineHeight:1.5}}>The following medications raise renin and/or lower aldosterone, pushing the screen toward negative. A positive result <strong>despite</strong> these medications increases diagnostic confidence, as the true ARR may be even higher than measured.</div>
+                    <div style={{marginTop:4,fontSize:11,color:C.t2}}>
+                      {strongOrIntFN.length > 0 && <div>• <strong>Strongly interfering:</strong> {strongOrIntFN.map(d=>d.label.split(" (")[0]).join(", ")}</div>}
+                      {weakFN.length > 0 && <div>• <strong>Weakly interfering:</strong> {weakFN.map(d=>d.label.split(" (")[0]).join(", ")}</div>}
+                    </div>
+                  </div>
+                  <div style={{marginTop:6,background:C.bg,borderRadius:6,padding:10,border:`1px solid ${C.w}33`}}>
+                    <div style={{fontSize:11,fontWeight:700,color:C.w,marginBottom:4}}>False-positive medications (weaken the result)</div>
+                    <div style={{fontSize:11,color:C.t1,lineHeight:1.5}}>The following medications lower renin, which can inflate the ARR and produce a false-positive result. This <strong>weakens</strong> confidence in the screening result.</div>
+                    <div style={{marginTop:4,fontSize:11,color:C.t2}}>
+                      • <strong>False-positive meds:</strong> {fp.map(d=>d.label.split("(")[0].trim()).join(", ")}
+                    </div>
+                  </div>
+                </>) : (<>
+                  <div style={{fontSize:11,fontWeight:700,color:C.g,textTransform:"uppercase",letterSpacing:.3,marginBottom:4}}>✅ Strengthened by Medication Context</div>
+                  This patient screened positive for primary aldosteronism <strong>despite being on medications that can cause false-negative results</strong> (i.e. medications that raise renin and/or lower aldosterone, which would push the screen toward negative). This strengthens confidence in the diagnosis, as the true aldosterone-to-renin ratio may be even higher than measured.
+                  <div style={{marginTop:6,fontSize:11,color:C.t2}}>
+                    Interfering medications:
+                    {strongOrIntFN.length > 0 && <span> <strong>Strongly interfering:</strong> {strongOrIntFN.map(d=>d.label.split(" (")[0]).join(", ")}.</span>}
+                    {weakFN.length > 0 && <span> <strong>Weakly interfering:</strong> {weakFN.map(d=>d.label.split(" (")[0]).join(", ")}.</span>}
+                  </div>
+                </>)}
               </div>
             )}
             {fp.length > 0 && fpStronglyPositive && (
@@ -1116,7 +1135,7 @@ function InterpretTool({mode="pcp"}){
 
                     {/* Spec-2: Strong + Far */}
                     {isStrong && isFar && (<>
-                      <div style={{fontSize:11,color:C.t1,lineHeight:1.6,marginBottom:8}}>PA is less likely but <strong>cannot be excluded</strong> when on strong interferors, particularly MRAs, as these can substantially suppress aldosterone and unsuppress renin. Consider withdrawing and retesting if the patient has features raising suspicion for PA (hypokalemia, OSA, resistant HTN, or age &lt;40). Empiric medical treatment with spironolactone is also reasonable.</div>
+                      <div style={{fontSize:11,color:C.t1,lineHeight:1.6,marginBottom:8}}>PA is less likely but <strong>cannot be excluded</strong> when on strong interferors, particularly MRAs, as these can substantially suppress aldosterone and unsuppress renin. Consider withdrawing and retesting if the patient has features raising suspicion for PA (hypokalemia, OSA, resistant HTN, age &lt;40, or first-degree relative with PA). Empiric medical treatment with spironolactone is also reasonable.</div>
                       <div style={{fontSize:11,fontWeight:700,color:C.wh,marginBottom:4}}>How would you like to proceed?</div>
                       <div style={{display:"flex",gap:5}}>
                         <BtnFn v="withdraw" label="Withdraw meds and retest" sel={fnEmpTreat} setSel={setFnEmpTreat} rec=""/>
@@ -1127,7 +1146,7 @@ function InterpretTool({mode="pcp"}){
 
                     {/* Spec-3: Weak + Far */}
                     {!isStrong && isFar && (<>
-                      <div style={{fontSize:11,color:C.t1,lineHeight:1.6,marginBottom:8}}>Low probability of false negative. Weak interferors are unlikely to substantially mask primary aldosteronism when values are well below threshold. Retesting after withdrawal is only warranted if the patient wants a definitive answer or has features raising suspicion for PA (hypokalemia, OSA, resistant HTN, or age &lt;40).</div>
+                      <div style={{fontSize:11,color:C.t1,lineHeight:1.6,marginBottom:8}}>Low probability of false negative. Weak interferors are unlikely to substantially mask primary aldosteronism when values are well below threshold.</div>
                       <div style={{fontSize:11,fontWeight:700,color:C.wh,marginBottom:4}}>How would you like to proceed?</div>
                       <div style={{display:"flex",gap:5}}>
                         <BtnFn v="accept" label="Accept as negative for PA" sel={fnEmpTreat} setSel={setFnEmpTreat} rec="accept"/>
@@ -1138,7 +1157,7 @@ function InterpretTool({mode="pcp"}){
 
                     {/* Spec-4: Weak + Close */}
                     {!isStrong && isClose && (<>
-                      <div style={{fontSize:11,color:C.t1,lineHeight:1.6,marginBottom:8}}>Values are close to PA thresholds and weak interferors could be contributing. Consider withdrawing and retesting, particularly if the patient has features raising suspicion for PA (hypokalemia, OSA, resistant HTN, or age &lt;40). Empiric medical treatment with spironolactone is also reasonable.</div>
+                      <div style={{fontSize:11,color:C.t1,lineHeight:1.6,marginBottom:8}}>Values are close to PA thresholds and weak interferors could be contributing. Consider withdrawing and retesting, particularly if the patient has features raising suspicion for PA (hypokalemia, OSA, resistant HTN, age &lt;40, or first-degree relative with PA). Empiric medical treatment with spironolactone is also reasonable.</div>
                       <div style={{fontSize:11,fontWeight:700,color:C.wh,marginBottom:4}}>How would you like to proceed?</div>
                       <div style={{display:"flex",gap:5}}>
                         <BtnFn v="withdraw" label="Withdraw meds and retest" sel={fnEmpTreat} setSel={setFnEmpTreat} rec=""/>
@@ -1206,7 +1225,7 @@ function InterpretTool({mode="pcp"}){
 
                     {fnEmpTreat==="accept"&&(<div style={{marginTop:10,background:C.bg,borderRadius:7,padding:12,border:`1px solid ${C.bdr}`}}>
                       <div style={{fontSize:12,fontWeight:700,color:C.t2,marginBottom:4}}>Accepted as negative for primary aldosteronism</div>
-                      <div style={{fontSize:11,color:C.t1,lineHeight:1.5}}>{hasStrongFN?"Although PA is less likely given values "+fnAction+" to threshold, it cannot be fully excluded when on strong interferors (particularly MRAs). If clinical suspicion changes, consider retesting after medication withdrawal.":"Low probability of false negative. Weak interferors are unlikely to substantially mask PA. Standard antihypertensive management should continue."}</div>
+                      <div style={{fontSize:11,color:C.t1,lineHeight:1.5}}>{hasStrongFN?"Although PA is less likely given values "+fnAction+" to threshold, it cannot be fully excluded when on strong interferors (particularly MRAs). If clinical suspicion changes (e.g. worsening HTN, new hypokalemia, OSA, or first-degree relative with PA identified), consider retesting after medication withdrawal.":"Low probability of false negative. Weak interferors are unlikely to substantially mask PA. Standard antihypertensive management should continue."}</div>
                     </div>)}
                   </>)}
 
@@ -1215,11 +1234,11 @@ function InterpretTool({mode="pcp"}){
                     {/* PCP-1: Strong + Close */}
                     {isStrong && isClose && (<div style={{fontSize:11,color:C.t1,lineHeight:1.6,marginBottom:8}}>Strong interferors (e.g. MRAs, ENaC inhibitors, diuretics) can substantially mask primary aldosteronism. With values close to threshold, <strong>specialist referral is strongly recommended</strong> to consider medication withdrawal and retesting, or empiric PA treatment.</div>)}
                     {/* PCP-2: Strong + Far */}
-                    {isStrong && isFar && (<div style={{fontSize:11,color:C.t1,lineHeight:1.6,marginBottom:8}}>PA is less likely but <strong>cannot be excluded</strong> when on strong interferors, particularly MRAs, as these can substantially suppress aldosterone and unsuppress renin. Consider specialist referral, especially if the patient has hypokalemia, OSA, resistant HTN, or age &lt;40.</div>)}
+                    {isStrong && isFar && (<div style={{fontSize:11,color:C.t1,lineHeight:1.6,marginBottom:8}}>PA is less likely but <strong>cannot be excluded</strong> when on strong interferors, particularly MRAs, as these can substantially suppress aldosterone and unsuppress renin. Consider specialist referral, especially if the patient has hypokalemia, OSA, resistant HTN, age &lt;40, or a first-degree relative with PA.</div>)}
                     {/* PCP-3: Weak + Far */}
                     {!isStrong && isFar && (<div style={{fontSize:11,color:C.t1,lineHeight:1.6,marginBottom:8}}>Low probability of false negative. PA is unlikely given weak interferors and values well below threshold. A false negative remains possible but the probability is low.</div>)}
                     {/* PCP-4: Weak + Close */}
-                    {!isStrong && isClose && (<div style={{fontSize:11,color:C.t1,lineHeight:1.6,marginBottom:8}}>Values are close to PA thresholds and weak interferors could be contributing. Consider specialist referral, particularly if the patient has hypokalemia, OSA, resistant HTN, or age &lt;40.</div>)}
+                    {!isStrong && isClose && (<div style={{fontSize:11,color:C.t1,lineHeight:1.6,marginBottom:8}}>Values are close to PA thresholds and weak interferors could be contributing. Consider specialist referral, particularly if the patient has hypokalemia, OSA, resistant HTN, age &lt;40, or a first-degree relative with PA.</div>)}
 
                     <div style={{fontSize:11,fontWeight:700,color:C.wh,marginBottom:4}}>How would you like to proceed?</div>
                     <div style={{display:"flex",gap:5}}>
@@ -1237,7 +1256,7 @@ function InterpretTool({mode="pcp"}){
 
                     {pcpFnAction==="accept"&&(<div style={{marginTop:8,background:C.bg,borderRadius:7,padding:12,border:`1px solid ${C.bdr}`}}>
                       <div style={{fontSize:12,fontWeight:700,color:C.t2,marginBottom:4}}>Accepted as negative for primary aldosteronism</div>
-                      <div style={{fontSize:11,color:C.t1,lineHeight:1.5}}>{hasStrongFN?"PA is less likely but cannot be fully excluded when on strong interferors, particularly MRAs. If clinical suspicion changes (e.g. worsening HTN, new hypokalemia, OSA diagnosed), consider specialist referral for medication withdrawal and retesting.":"Low probability of false negative. Weak interferors are unlikely to substantially mask PA. Standard antihypertensive management should continue."}</div>
+                      <div style={{fontSize:11,color:C.t1,lineHeight:1.5}}>{hasStrongFN?"PA is less likely but cannot be fully excluded when on strong interferors, particularly MRAs. If clinical suspicion changes (e.g. worsening HTN, new hypokalemia, OSA diagnosed, or first-degree relative with PA identified), consider specialist referral for medication withdrawal and retesting.":"Low probability of false negative. Weak interferors are unlikely to substantially mask PA. Standard antihypertensive management should continue."}</div>
                     </div>)}
                     {pcpFnAction==="refer"&&(<div style={{marginTop:8,background:C.bg,borderRadius:7,padding:12,border:`1px solid ${C.acc}33`}}>
                       <div style={{fontSize:12,fontWeight:700,color:C.acc,marginBottom:4}}>📋 Referral to Specialist Recommended</div>
@@ -1261,7 +1280,7 @@ function InterpretTool({mode="pcp"}){
             {/* Only show rescreen advice when accepted as negative */}
             {(fn.length===0 || (isSpec&&fnEmpTreat==="accept") || (!isSpec&&pcpFnAction==="accept")) && (
               <div style={{background:C.bg,borderRadius:6,padding:10,fontSize:11,color:C.t2,lineHeight:1.5,border:`1px solid ${C.bdr}`,marginTop:6}}>
-                <strong style={{color:C.t1}}>Rescreen if:</strong> worsening/resistant HTN, new hypokalemia, or unexplained AFib.
+                <strong style={{color:C.t1}}>Rescreen if:</strong> worsening/resistant HTN, new hypokalemia, unexplained AFib, or first-degree relative identified with PA.
               </div>
             )}
           </>)}
@@ -1301,14 +1320,16 @@ function InterpretTool({mode="pcp"}){
             else note+=`Given that aldosterone is below ${fpHighThreshLabel}, a false positive cannot be excluded. Specialist referral is recommended for medication withdrawal and retesting. `;
           }
           if(fn.length>0){
-            const fnStrongList=strongFN.map(d=>d.label.split(" (")[0]).join(", ");
-            const fnIntList=intermediateFN.map(d=>d.label.split(" (")[0]).join(", ");
+            const fnStrongList=strongOrIntFN.map(d=>d.label.split(" (")[0]).join(", ");
             const fnWeakList=weakFN.map(d=>d.label.split(" (")[0]).join(", ");
             let fnMedDesc=[];
             if(fnStrongList) fnMedDesc.push(`strongly interfering: ${fnStrongList}`);
-            if(fnIntList) fnMedDesc.push(`intermediately interfering: ${fnIntList}`);
             if(fnWeakList) fnMedDesc.push(`weakly interfering: ${fnWeakList}`);
-            note+=`Importantly, the patient is on medications that can cause false-negative results (${fnMedDesc.join("; ")}). The screen is positive despite these medications, which strengthens diagnostic confidence as the true aldosterone-to-renin ratio may be even higher than measured. `;
+            if(fp.length>0){
+              note+=`The patient is also on medications that can cause false-negative results (${fnMedDesc.join("; ")}), which raise renin and/or lower aldosterone. The presence of both false-positive and false-negative medications creates a mixed medication context: the false-negative medications strengthen the positive result (as the true ARR may be even higher), while the false-positive medications (${fpList}) weaken it (as suppressed renin may inflate the ARR). `;
+            } else {
+              note+=`Importantly, the patient is on medications that can cause false-negative results (${fnMedDesc.join("; ")}). The screen is positive despite these medications, which strengthens diagnostic confidence as the true aldosterone-to-renin ratio may be even higher than measured. `;
+            }
           }
           if(hypoK) note+=`Hypokalemia is present, which is a feature of more severe primary aldosteronism. `;
           
@@ -1501,13 +1522,13 @@ function InterpretTool({mode="pcp"}){
           } else if(isSpec&&fn.length>0&&fnEmpTreat==="accept"){
             note+=`- No primary aldosteronism-specific treatment indicated at this time\n`;
             note+=hasStrongFN?`- If clinical suspicion changes (worsening HTN, new hypokalemia, OSA diagnosed), consider withdrawing interfering medications and retesting\n`:``;
-            note+=`- Rescreen if patient develops worsening or resistant hypertension, new spontaneous or diuretic-induced hypokalemia, or unexplained atrial fibrillation`;
+            note+=`- Rescreen if patient develops worsening or resistant hypertension, new spontaneous or diuretic-induced hypokalemia, unexplained atrial fibrillation, or first-degree relative identified with primary aldosteronism`;
           } else if(!isSpec&&fn.length>0&&pcpFnAction==="refer"){
             note+=`- Refer to specialist for evaluation — specialist can either withdraw interfering medications and retest, or empirically treat with an MRA\n`;
             note+=`- Continue current antihypertensive management in the interim`;
           } else {
             note+=`- No primary aldosteronism-specific treatment indicated at this time\n`;
-            note+=`- Rescreen if patient develops worsening or resistant hypertension, new spontaneous or diuretic-induced hypokalemia, or unexplained atrial fibrillation`;
+            note+=`- Rescreen if patient develops worsening or resistant hypertension, new spontaneous or diuretic-induced hypokalemia, unexplained atrial fibrillation, or first-degree relative identified with primary aldosteronism`;
           }
         }
         logData(isSpec?"tool_specialist_consult":"tool_pcp_interpret",{age_range:_age,sex:_sex,renin_suppressed:renSup||false,aldo_elevated:aldHi||false,arr_elevated:arrHi||false,screen_positive:pos||false,bp_sbp:_bpSbp||null,bp_dbp:_bpDbp||null,bp_type:_bpType||null,hypokalemia:hypoK||false,fp_meds:fp.length>0,fn_meds:fn.length>0,fn_strong:strongOrIntFN.map(d=>d.label.split(" (")[0]).join(", ")||null,fn_weak:weakFN.map(d=>d.label.split(" (")[0]).join(", ")||null,fp_decision:fpDecision||null,fn_action:fnAction||null,fn_emp_treat:fnEmpTreat||null,fn_surg_toggle:fnSurgToggle||null,pcp_fn_action:pcpFnAction||null,fn_replace_meds:Object.entries(fnReplaceMeds).filter(([k,v])=>v).length>0?JSON.stringify(fnReplaceMeds):null,lateralization:lat?lat.lev:"none"});
