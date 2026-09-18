@@ -40,8 +40,8 @@ function calcEGFR(cr, age, sex) {
 const DRUGS = [
   { id: "mra", label: "MRA (e.g. spironolactone, eplerenone, finerenone)", kw: ["spironolactone","eplerenone","finerenone","aldactone","inspra","kerendia","mra"], renin: "↑", aldo: "↑", wo: 4, risk: "fn", strength: "strong" },
   { id: "enac", label: "ENaC inhibitor (e.g. amiloride, triamterene)", kw: ["amiloride","triamterene","midamor","dyrenium","enac"], renin: "↑", aldo: "—", wo: 4, risk: "fn", strength: "strong" },
-  { id: "drospirenone", label: "Drospirenone-containing OCP (e.g. Yaz, Yasmin)", kw: ["drospirenone","yaz","yasmin","slynd"], renin: "↑", aldo: "↑", wo: 4, risk: "fn", strength: "strong" },
   { id: "diuretic", label: "Diuretic (e.g. HCTZ, chlorthalidone, furosemide, indapamide)", kw: ["hctz","hydrochlorothiazide","chlorthalidone","indapamide","furosemide","lasix","bumetanide","torsemide","metolazone","thiazide","diuretic"], renin: "↑", aldo: "↑", wo: 4, risk: "fn", strength: "intermediate" },
+  { id: "ocp_estrogen", label: "Estrogen-containing OCP or HRT", kw: ["oral contraceptive","ocp","hrt","estrogen","hormone replacement","alesse","marvelon","yaz","yasmin","drospirenone","slynd","birth control","estradiol","premarin","activella"], renin: "↑ DRC (falsely elevates)", aldo: "—", wo: 4, risk: "fp_drc", strength: "strong" },
   { id: "acei", label: "ACE inhibitor (e.g. ramipril, perindopril, enalapril, lisinopril)", kw: ["lisinopril","ramipril","enalapril","perindopril","quinapril","benazepril","captopril","fosinopril","trandolapril","acei","ace inhibitor","zestril","altace","vasotec"], renin: "↑", aldo: "↓", wo: 2, risk: "fn", strength: "weak" },
   { id: "arb", label: "ARB (e.g. valsartan, candesartan, telmisartan, losartan, irbesartan)", kw: ["losartan","valsartan","irbesartan","candesartan","telmisartan","olmesartan","azilsartan","arb","cozaar","diovan","avapro","atacand"], renin: "↑", aldo: "↓", wo: 2, risk: "fn", strength: "weak" },
   { id: "ccb_dhp", label: "DHP calcium-channel blocker (e.g. amlodipine, nifedipine, felodipine)", kw: ["amlodipine","nifedipine","felodipine","norvasc","adalat","plendil","dihydropyridine"], renin: "—", aldo: "—", wo: 2, risk: "fn", strength: "weak" },
@@ -49,7 +49,6 @@ const DRUGS = [
   { id: "beta", label: "Beta-blocker (e.g. metoprolol, bisoprolol, atenolol, carvedilol)", kw: ["metoprolol","atenolol","bisoprolol","propranolol","carvedilol","nebivolol","nadolol","labetalol","sotalol","beta blocker","lopressor","toprol","coreg","bystolic"], renin: "↓", aldo: "↓", wo: 2, risk: "fp", strength: "fp" },
   { id: "alpha2", label: "Central α₂-agonist (e.g. clonidine, methyldopa)", kw: ["clonidine","methyldopa","catapres","aldomet","alpha2","alpha-2"], renin: "↓", aldo: "↓", wo: 2, risk: "fp", strength: "fp" },
   { id: "nsaid", label: "NSAID — regular use (e.g. ibuprofen, naproxen, celecoxib)", kw: ["ibuprofen","naproxen","diclofenac","indomethacin","celecoxib","meloxicam","nsaid","advil","motrin","celebrex","aleve"], renin: "↓", aldo: "—", wo: 2, woUncertain: true, risk: "fp", strength: "fp" },
-  { id: "ocp", label: "Combined OCP / HRT — estrogen + progesterone (complex effect)", kw: ["oral contraceptive","ocp","hrt","estrogen","progesterone","hormone replacement","alesse","marvelon"], renin: "complex", aldo: "↑", wo: 0, risk: "complex", strength: "complex" },
 ];
 
 function detectDrugs(text) {
@@ -538,6 +537,7 @@ function InterpretTool({mode="pcp"}){
   const [pcpFnAction,setPcpFnAction]=useState(""); // pcp: "accept","refer"
   const [fnSurgToggle,setFnSurgToggle]=useState(""); // Spec-1 only: "yes","no"
   const [fpDecision,setFpDecision]=useState(""); // specialist FP borderline: "accept_pa","withdraw_retest"
+  const [ocpDrcDecision,setOcpDrcDecision]=useState(""); // specialist OCP+DRC: "retest_pra","withdraw_ocp"
   const [fnReplaceMeds,setFnReplaceMeds]=useState({}); // selected replacement meds during withdrawal
   // Management snapshot (specialist only — gates next steps + clinical note on surgical decisions)
   const [mgmtSnap,setMgmtSnap]=useState(null);
@@ -614,7 +614,9 @@ function InterpretTool({mode="pcp"}){
   const checked=DRUGS.filter(d=>_mc[d.id]);
   const parsed=useMemo(()=>detectDrugs(_mt),[_mt]);
   const allM=useMemo(()=>{const ids=new Set([...checked.map(d=>d.id),...parsed.map(d=>d.id)]);return DRUGS.filter(d=>ids.has(d.id));},[_mc,_mt]);
-  const fp=allM.filter(d=>d.risk==="fp");
+  const isDRC=!ren.isPRA; // true if using Direct Renin Concentration
+  const fpDrc=allM.filter(d=>d.risk==="fp_drc"); // estrogen OCP/HRT — only FP when DRC
+  const fp=allM.filter(d=>d.risk==="fp"||(d.risk==="fp_drc"&&isDRC));
   const fn=allM.filter(d=>d.risk==="fn");
   // FP threshold: 416 pmol/L (≈15 ng/dL) — above this, PA is likely despite FP meds
   const fpHighThresh=ald.u.includes("pmol")?416:15;
@@ -717,7 +719,7 @@ function InterpretTool({mode="pcp"}){
       <div style={{fontSize:12,fontWeight:700,color:C.wh,marginBottom:3}}>Medications</div>
       <div style={{fontSize:10,color:C.t3,marginBottom:8}}>Check relevant classes and/or paste the full list below.</div>
       {DRUGS.map(d=><Chk key={d.id} checked={!!mc[d.id]} onChange={()=>setMc(p=>({...p,[d.id]:!p[d.id]}))} label={d.label}
-        tag={d.risk==="fp"?<Pill c={C.r} bg={C.rS}>false+</Pill>:d.risk==="fn"&&d.strength==="strong"?<Pill c={C.w} bg={C.wS}>strong false−</Pill>:d.risk==="fn"&&d.strength==="intermediate"?<Pill c={C.w} bg={C.wS+"88"}>intermediate false−</Pill>:d.risk==="fn"?<Pill c={C.t2} bg={C.bdr+"55"}>weak false−</Pill>:null}/>)}
+        tag={d.risk==="fp"?<Pill c={C.r} bg={C.rS}>false+</Pill>:d.risk==="fp_drc"&&isDRC?<Pill c={C.r} bg={C.rS}>false+ (DRC)</Pill>:d.risk==="fp_drc"&&!isDRC?<Pill c={C.t3} bg={C.bdr+"55"}>no effect (PRA)</Pill>:d.risk==="fn"&&d.strength==="strong"?<Pill c={C.w} bg={C.wS}>strong false−</Pill>:d.risk==="fn"&&d.strength==="intermediate"?<Pill c={C.w} bg={C.wS+"88"}>intermediate false−</Pill>:d.risk==="fn"?<Pill c={C.t2} bg={C.bdr+"55"}>weak false−</Pill>:null}/>)}
       <div style={{fontSize:10,color:C.t2,marginTop:8,marginBottom:3}}>Or paste full med list (one per line or comma-separated):</div>
       <textarea value={mt} onChange={e=>setMt(e.target.value)} rows={3}
         placeholder={"Paste medication list here..."}
@@ -835,8 +837,38 @@ function InterpretTool({mode="pcp"}){
               </div>
             )}
 
-            {/* PCP: Simple referral instead of lateralization */}
-            {!isSpec && pos && (
+            {/* OCP/HRT + DRC specific warning */}
+            {fpDrc.length > 0 && isDRC && pos && (
+              <div style={{background:C.card,border:`1px solid ${C.w}44`,borderRadius:8,padding:12,marginBottom:8,fontSize:12,color:C.t1,lineHeight:1.6}}>
+                <div style={{fontSize:11,fontWeight:700,color:C.w,textTransform:"uppercase",letterSpacing:.3,marginBottom:4}}>⚠ Estrogen-Containing OCP/HRT + DRC Alert</div>
+                This patient is on <strong>{fpDrc.map(d=>d.label).join(", ")}</strong>. Estrogen-containing medications <strong>falsely elevate Direct Renin Concentration (DRC)</strong>, which can cause a false-positive screening result. This effect does not occur with Plasma Renin Activity (PRA).
+                <div style={{marginTop:8,fontSize:11,fontWeight:700,color:C.wh,marginBottom:4}}>The diagnosis cannot be confirmed until this interference is resolved:</div>
+
+                {/* Specialist: choose retest method */}
+                {isSpec && (<>
+                  <div style={{display:"flex",gap:5,marginTop:6}}>
+                    {[{v:"retest_pra",l:"Retest using PRA instead of DRC"},{v:"withdraw_ocp",l:"Withdraw OCP/HRT (4-week washout) and retest"}].map(o=>(<button key={o.v} onClick={()=>setOcpDrcDecision(o.v)} style={{flex:1,padding:"7px 4px",borderRadius:5,border:`1px solid ${ocpDrcDecision===o.v?C.acc:C.bdr}`,background:ocpDrcDecision===o.v?C.accS:"transparent",color:ocpDrcDecision===o.v?C.acc:C.t2,fontSize:10,fontWeight:600,fontFamily:F,cursor:"pointer",lineHeight:1.3,textAlign:"center"}}>{o.l}</button>))}
+                  </div>
+                  {ocpDrcDecision==="retest_pra"&&(<div style={{marginTop:8,background:C.bg,borderRadius:7,padding:12,border:`1px solid ${C.acc}33`}}>
+                    <div style={{fontSize:12,fontWeight:700,color:C.acc,marginBottom:4}}>Plan: Retest with PRA</div>
+                    <div style={{fontSize:11,color:C.t1,lineHeight:1.5}}>Repeat aldosterone and renin testing using <strong>Plasma Renin Activity (PRA)</strong> instead of DRC. This eliminates the estrogen interference and will provide a more accurate screening result. The patient can remain on their current OCP/HRT.</div>
+                  </div>)}
+                  {ocpDrcDecision==="withdraw_ocp"&&(<div style={{marginTop:8,background:C.bg,borderRadius:7,padding:12,border:`1px solid ${C.acc}33`}}>
+                    <div style={{fontSize:12,fontWeight:700,color:C.acc,marginBottom:4}}>Plan: Withdraw OCP/HRT and Retest</div>
+                    <div style={{fontSize:11,color:C.t1,lineHeight:1.5}}>Withdraw the estrogen-containing OCP/HRT and allow a <strong>4-week washout period</strong>. Then repeat aldosterone and renin testing using DRC. Discuss alternative contraception or hormone management during the washout period.</div>
+                  </div>)}
+                </>)}
+
+                {/* PCP: refer to specialist for retesting */}
+                {!isSpec && (<div style={{marginTop:8,background:C.bg,borderRadius:7,padding:12,border:`1px solid ${C.acc}33`}}>
+                  <div style={{fontSize:12,fontWeight:700,color:C.acc,marginBottom:4}}>📋 Specialist Referral Recommended for Retesting</div>
+                  <div style={{fontSize:11,color:C.t1,lineHeight:1.5}}>Because estrogen-containing OCP/HRT can falsely elevate DRC, <strong>this positive result cannot be confirmed without further testing</strong>. Specialist referral is recommended to facilitate retesting — either by repeating the screen using PRA (which is not affected by estrogen) or by withdrawing the OCP/HRT and retesting after a 4-week washout.</div>
+                </div>)}
+              </div>
+            )}
+
+            {/* PCP: Simple referral instead of lateralization — hide if OCP/DRC scenario (handled above) */}
+            {!isSpec && pos && !(fpDrc.length>0&&isDRC) && (
               <div style={{background:C.card,border:`1px solid ${C.acc}44`,borderRadius:9,padding:14,marginTop:10}}>
                 <div style={{fontSize:11,fontWeight:800,color:C.acc,textTransform:"uppercase",letterSpacing:.3,marginBottom:6}}>Next Steps</div>
                 <div style={{fontSize:12,color:C.t1,lineHeight:1.7}}>
@@ -848,8 +880,8 @@ function InterpretTool({mode="pcp"}){
               </div>
             )}
 
-            {/* Specialist: Full lateralization assessment — only if no FP borderline issue or accepted as PA */}
-            {isSpec && (!fpWeaklyPositive || fp.length===0 || fpDecision==="accept_pa") && (<>
+            {/* Specialist: Full lateralization assessment — only if no FP borderline issue or accepted as PA, and no unresolved OCP/DRC */}
+            {isSpec && (!fpWeaklyPositive || fp.length===0 || fpDecision==="accept_pa") && !(fpDrc.length>0&&isDRC) && (<>
             <SectionHead number={2} title="Lateralization Assessment" active={pos}/>
             <div style={{background:C.card,border:`1px solid ${C.bdr}`,borderRadius:9,padding:14,marginBottom:10}}>
 
@@ -1290,7 +1322,7 @@ function InterpretTool({mode="pcp"}){
       {/* Clinical Note — only show when all required sections are submitted */}
       {(()=>{
         // Gate: for positive screen, need latSnap. For specialist intermediate/high, also need mgmtSnap.
-        if(pos&&isSpec&&!latSnap&&!(fp.length>0&&fpWeaklyPositive&&fpDecision==="withdraw_retest")) return null;
+        if(pos&&isSpec&&!latSnap&&!(fp.length>0&&fpWeaklyPositive&&fpDecision==="withdraw_retest")&&!(fpDrc.length>0&&isDRC&&ocpDrcDecision)) return null;
         if(pos&&isSpec&&latSnap&&lat&&(lat.lev==="high"||lat.lev==="intermediate")&&!mgmtSnap) return null;
         // For negative screen with FN meds: gate on decisions being made
         if(!pos&&fn.length>0&&!hypoK){
@@ -1318,6 +1350,12 @@ function InterpretTool({mode="pcp"}){
             else if(isSpec&&fpDecision==="withdraw_retest") note+=`Given that aldosterone is below ${fpHighThreshLabel}, a false positive cannot be excluded. The plan is to withdraw false-positive medications and retest to confirm or exclude the diagnosis. `;
             else if(isSpec) note+=`Given that aldosterone is below ${fpHighThreshLabel}, a false positive cannot be excluded. Retesting after medication withdrawal should be performed. `;
             else note+=`Given that aldosterone is below ${fpHighThreshLabel}, a false positive cannot be excluded. Specialist referral is recommended for medication withdrawal and retesting. `;
+          }
+          if(fpDrc.length>0&&isDRC&&pos){
+            note+=`Of note, the patient is on estrogen-containing OCP/HRT, which falsely elevates Direct Renin Concentration (DRC). This effect does not occur with Plasma Renin Activity (PRA). The positive screening result cannot be confirmed until this interference is resolved. `;
+            if(isSpec&&ocpDrcDecision==="retest_pra") note+=`The plan is to repeat aldosterone and renin testing using PRA instead of DRC to eliminate estrogen interference. The patient will remain on their current OCP/HRT. `;
+            else if(isSpec&&ocpDrcDecision==="withdraw_ocp") note+=`The plan is to withdraw the estrogen-containing OCP/HRT, allow a 4-week washout period, and repeat aldosterone and renin testing using DRC. `;
+            else if(!isSpec) note+=`Specialist referral is recommended to facilitate retesting — either using PRA (not affected by estrogen) or after withdrawing the OCP/HRT (4-week washout). `;
           }
           if(fn.length>0){
             const fnStrongList=strongOrIntFN.map(d=>d.label.split(" (")[0]).join(", ");
@@ -1443,6 +1481,24 @@ function InterpretTool({mode="pcp"}){
               note+=`- Withdraw false-positive medications: ${fp.map(d=>d.label.split("(")[0].trim()).join(", ")}\n`;
               fp.forEach(d=>{note+=`  - ${d.label.split("(")[0].trim()}: ${d.woUncertain?`~${d.wo} weeks`:d.wo+` weeks`} washout\n`;});
               note+=`- Repeat aldosterone and renin testing after washout to confirm or exclude primary aldosteronism`;
+          } else if(isSpec&&fpDrc.length>0&&isDRC&&ocpDrcDecision) {
+              note+=`\n\nPlan:\n`;
+              if(ocpDrcDecision==="retest_pra"){
+                note+=`- Repeat aldosterone and renin testing using PRA instead of DRC to eliminate estrogen interference\n`;
+                note+=`- Patient may remain on current OCP/HRT\n`;
+                note+=`- If repeat screen is positive with PRA, proceed with PA workup`;
+              } else {
+                note+=`- Withdraw estrogen-containing OCP/HRT\n`;
+                note+=`- Allow 4-week washout period — discuss alternative contraception or hormone management\n`;
+                note+=`- Repeat aldosterone and renin testing (DRC) after washout\n`;
+                note+=`- If repeat screen is positive off OCP/HRT, proceed with PA workup`;
+              }
+          } else if(!isSpec&&fpDrc.length>0&&isDRC) {
+              // PCP with OCP/DRC — referral for retesting only
+              note+=`\n\nPlan:\n`;
+              note+=`- Specialist referral recommended to facilitate retesting — either using PRA (not affected by estrogen) or after withdrawing OCP/HRT (4-week washout)\n`;
+              note+=`- The positive screening result cannot be confirmed while on estrogen-containing OCP/HRT with DRC measurement\n`;
+              note+=`- Continue current management in the interim`;
           } else if(!isSpec) {
               // ── PCP NOTE (simplified — no lateralization) ──
               note+=`\n\nPlan:\n`;
@@ -1536,7 +1592,7 @@ function InterpretTool({mode="pcp"}){
       })()}
 
       <div style={{textAlign:"center",marginTop:14}}>
-        <Btn small onClick={()=>{setPhase("input");setSnap(null);setLatSnap(null);setMgmtSnap(null);setRV("");setAV("");setKV("");setBpSbp("");setBpDbp("");setBpType("office");setAdnStatus("");setAdnSzMain("");setAdnSzLeft("");setCr("");setEgD("");setAge("");setSex("");setResHTN(false);setSurgCandidate("");setSurgInterest("");setSpecAvsDecision("");setForegoAvs("");setFnAction("");setFnEmpTreat("");setPcpFnAction("");setFnSurgToggle("");setFpDecision("");setFnReplaceMeds({});}}>🔄 New Patient</Btn>
+        <Btn small onClick={()=>{setPhase("input");setSnap(null);setLatSnap(null);setMgmtSnap(null);setRV("");setAV("");setKV("");setBpSbp("");setBpDbp("");setBpType("office");setAdnStatus("");setAdnSzMain("");setAdnSzLeft("");setCr("");setEgD("");setAge("");setSex("");setResHTN(false);setSurgCandidate("");setSurgInterest("");setSpecAvsDecision("");setForegoAvs("");setFnAction("");setFnEmpTreat("");setPcpFnAction("");setFnSurgToggle("");setFpDecision("");setOcpDrcDecision("");setFnReplaceMeds({});}}>🔄 New Patient</Btn>
       </div>
     </div>}
 
