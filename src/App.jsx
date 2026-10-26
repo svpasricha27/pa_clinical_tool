@@ -60,7 +60,7 @@ function detectDrugs(text) {
 // ─── Renin/Aldo from Table 5 ───
 const REN = [
   { id: "drc_ngl", l: "Direct Renin Concentration (ng/L)", sup: 5.2, u: "ng/L", isPRA: false, toStd: 1/5.2 },
-  { id: "drc_mu", l: "Direct Renin Concentration (mU/L)", sup: 8.2, u: "mU/L", isPRA: false, toStd: 1/8.2 },
+  { id: "drc_mu", l: "Direct Renin Concentration (mU/L or µIU/mL)", sup: 8.2, u: "mU/L (or µIU/mL)", isPRA: false, toStd: 1/8.2 },
   { id: "pra_ng", l: "Plasma Renin Activity (ng/mL/h)", sup: 1, u: "ng/mL/h", isPRA: true, toStd: 1 },
   { id: "pra_pmol", l: "Plasma Renin Activity (pmol/L/min)", sup: 12.9, u: "pmol/L/min", isPRA: true, toStd: 1/12.9 },
   { id: "pra_ngl", l: "Plasma Renin Activity (ng/L/s)", sup: 0.28, u: "ng/L/s", isPRA: true, toStd: 1/0.28 },
@@ -654,7 +654,7 @@ function InterpretTool({mode="pcp"}){
     if(!hypoK) lo.push("Normokalemia");
     if(aldIA&&ald.isIA&&aldIA<11) lo.push("Aldo <11 ng/dL");
     if(aldNg&&!ald.isIA&&aldNg<8) lo.push("Aldo <8 ng/dL LC-MS/MS");
-    if(renSup&&!renVL) lo.push(`Renin suppressed but not profoundly (${_rV} ${ren.u}; profoundly suppressed: ${ren.id==="pra_ng"?"<0.2 ng/mL/h":ren.id==="pra_pmol"?"<2.6 pmol/L/min":ren.id==="pra_ngl"?"<0.056 ng/L/s":ren.id==="drc_ngl"?"<1.3 ng/L":"<2 mU/L"})`);
+    if(renSup&&!renVL) lo.push(`Renin suppressed but not profoundly (${_rV} ${ren.u}; profoundly suppressed: ${ren.id==="pra_ng"?"<0.2 ng/mL/h":ren.id==="pra_pmol"?"<2.6 pmol/L/min":ren.id==="pra_ngl"?"<0.056 ng/L/s":ren.id==="drc_ngl"?"<1.3 ng/L":"<2 mU/L (or µIU/mL)"})`);
     if(hi.length>=2) return {lev:"high",hi,lo};
     if(hi.length===0&&lo.length>=1) return {lev:"low",hi,lo};
     return {lev:"intermediate",hi,lo};
